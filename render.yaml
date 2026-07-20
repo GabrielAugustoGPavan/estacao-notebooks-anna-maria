@@ -1,0 +1,16 @@
+# Blueprint do Render — cria o serviço automaticamente ao conectar o repositório
+# (Render Dashboard → New → Blueprint → selecionar este repositório)
+services:
+  - type: web
+    name: estacao-notebooks-anna-maria
+    runtime: node
+    plan: free
+    rootDir: sistema
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: JWT_SEGREDO
+        generateValue: true          # o Render gera um segredo forte automaticamente
+      - key: DATABASE_URL
+        sync: false                  # colar aqui a URL do PostgreSQL (Neon) na criação

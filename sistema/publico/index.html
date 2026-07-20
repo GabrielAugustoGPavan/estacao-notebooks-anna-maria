@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Organização Estação Notebooks — E.E Anna Maria</title>
+<style>
+  :root{
+    --azul:#1e5aa8; --azul-escuro:#143d73; --fundo:#eef2f7;
+    --verde:#2e9e5b; --amarelo:#e0a800; --vermelho:#d64545;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',system-ui,sans-serif;}
+  body{background:var(--fundo); min-height:100vh; color:#22303e;}
+
+  header{background:var(--azul); color:#fff; padding:14px 20px; display:flex;
+         align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;}
+  header h1{font-size:1.05rem; font-weight:600;}
+  header .perfil{font-size:.85rem; background:rgba(255,255,255,.15); color:#fff;
+                 padding:6px 12px; border-radius:20px; cursor:pointer; border:none;
+                 font-family:inherit;}
+
+  #telaLogin,#telaSenha{padding:0 16px;}
+  .cartao-central{max-width:400px; margin:6vh auto; background:#fff; border-radius:14px;
+              padding:34px 30px; box-shadow:0 8px 30px rgba(20,61,115,.12);}
+  .cartao-central .logo{width:64px; height:64px; background:var(--azul); border-radius:16px;
+        margin:0 auto 14px; display:flex; align-items:center; justify-content:center;
+        color:#fff; font-size:1.8rem;}
+  .cartao-central h2{text-align:center; font-size:1.15rem; color:var(--azul-escuro);}
+  .cartao-central p.sub{text-align:center; font-size:.82rem; color:#7a8694; margin:4px 0 22px;}
+  .campo{margin-bottom:14px;}
+  .campo label{display:block; font-size:.8rem; font-weight:600; margin-bottom:5px; color:#44536a;}
+  .campo input, .campo select{width:100%; padding:11px 12px; border:1.5px solid #d5dde7;
+        border-radius:9px; font-size:.92rem; background:#fbfcfe;}
+  .campo input:focus, .campo select:focus{outline:none; border-color:var(--azul);}
+  .btn{width:100%; padding:12px; background:var(--azul); color:#fff; border:none;
+       border-radius:9px; font-size:.98rem; font-weight:600; cursor:pointer; transition:.2s;}
+  .btn:hover{background:var(--azul-escuro);}
+  .btn.secundario{background:#e8edf4; color:var(--azul-escuro);}
+  .btn:disabled{background:#e8edf4; color:#9aa6b5; cursor:not-allowed;}
+  .seletor-perfil{display:flex; gap:8px; margin-bottom:18px;}
+  .seletor-perfil button{flex:1; padding:10px; border:1.5px solid #d5dde7; background:#fff;
+        border-radius:9px; font-size:.85rem; cursor:pointer; font-weight:600; color:#66748a;}
+  .seletor-perfil button.ativo{border-color:var(--azul); background:#e9f1fb; color:var(--azul);}
+  .erro{color:var(--vermelho); font-size:.8rem; text-align:center; margin-bottom:10px; display:none;}
+  .erro.visivel{display:block;}
+
+  .painel{max-width:1060px; margin:0 auto; padding:22px 16px 60px;}
+  .painel h2{font-size:1.05rem; color:var(--azul-escuro); margin-bottom:4px;}
+  .painel p.sub{font-size:.83rem; color:#7a8694; margin-bottom:20px;}
+  .grade-estacoes{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px;}
+
+  .cartao{background:#fff; border-radius:14px; padding:20px;
+          box-shadow:0 4px 18px rgba(20,61,115,.08); text-align:center;}
+  .cartao h3{font-size:1rem; color:var(--azul-escuro); margin-bottom:2px;}
+  .cartao .local{font-size:.78rem; color:#8a95a3; margin-bottom:12px;}
+  .cartao .local b{color:#44536a;}
+  .badge{display:inline-block; font-size:.72rem; font-weight:700; padding:4px 12px;
+         border-radius:20px; margin-bottom:12px;}
+  .badge.disponivel{background:#e2f5ea; color:var(--verde);}
+  .badge.em-uso{background:#fdf3d7; color:#9c7400;}
+  .badge.divergencia{background:#fbe3e3; color:var(--vermelho);}
+  .contagem{font-size:.85rem; margin:10px 0 14px; color:#44536a;}
+  .contagem b{font-size:1.25rem; color:var(--azul-escuro);}
+  .aviso-bloqueio{font-size:.74rem; color:#9c7400; margin-top:8px;}
+
+  .gabinete{width:190px; margin:0 auto; display:block; overflow:visible;}
+  .porta-esq,.porta-dir{transition:transform 1.1s cubic-bezier(.4,0,.2,1); transform-box:fill-box;}
+  .porta-esq{transform-origin:left center;}
+  .porta-dir{transform-origin:right center;}
+  .cartao.aberto .porta-esq{transform:perspective(700px) rotateY(-128deg);}
+  .cartao.aberto .porta-dir{transform:perspective(700px) rotateY(128deg);}
+  .slot{transition:fill .4s;}
+  .slot.cheio{fill:#3a86d6;}
+  .slot.cheio.carregando{animation:pulso 1.6s infinite;}
+  .slot.vazio{fill:#cfd3d7;}
+  .slot.neutro{fill:#9fb3c8;}
+  @keyframes pulso{0%,100%{fill:#3a86d6;}50%{fill:#7db8f0;}}
+  .led{animation:brilho 2s infinite;}
+  @keyframes brilho{0%,100%{opacity:1;}50%{opacity:.45;}}
+
+  .sombra{position:fixed; inset:0; background:rgba(15,30,50,.55); display:none;
+          align-items:center; justify-content:center; padding:16px; z-index:50;}
+  .sombra.visivel{display:flex;}
+  .modal{background:#fff; border-radius:14px; padding:26px 24px; width:100%; max-width:400px;
+         animation:surgir .25s ease;}
+  @keyframes surgir{from{transform:translateY(18px); opacity:0;} to{transform:none; opacity:1;}}
+  .modal h3{color:var(--azul-escuro); font-size:1.02rem; margin-bottom:4px;}
+  .modal p.sub{font-size:.8rem; color:#7a8694; margin-bottom:18px;}
+  .alerta{background:#fdf3d7; color:#9c7400; font-size:.8rem; padding:10px 12px;
+          border-radius:8px; margin-bottom:12px; display:none;}
+  .alerta.visivel{display:block;}
+  .linha-botoes{display:flex; gap:10px; margin-top:6px;}
+
+  .toast{position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(80px);
+         background:var(--verde); color:#fff; font-size:.88rem; font-weight:600;
+         padding:13px 22px; border-radius:30px; box-shadow:0 6px 20px rgba(0,0,0,.25);
+         opacity:0; transition:.35s; z-index:60; pointer-events:none; max-width:92vw; text-align:center;}
+  .toast.visivel{transform:translateX(-50%) translateY(0); opacity:1;}
+
+  .bloco-gestao{margin-top:26px; background:#fff; border-radius:14px; padding:20px;
+             box-shadow:0 4px 18px rgba(20,61,115,.08); overflow-x:auto;}
+  .bloco-gestao h3{font-size:.95rem; color:var(--azul-escuro); margin-bottom:12px;}
+  .notificacao{background:#fbe3e3; color:#8c2f2f; font-size:.82rem; padding:10px 14px;
+               border-radius:9px; margin-bottom:8px; display:flex; gap:10px;}
+  .notificacao .hora{font-weight:700; white-space:nowrap;}
+  .sem-notificacao{font-size:.82rem; color:#7a8694;}
+  table{width:100%; border-collapse:collapse; font-size:.8rem; min-width:560px;}
+  th{text-align:left; color:#66748a; font-weight:600; padding:8px 10px; border-bottom:2px solid #e8edf4;}
+  td{padding:9px 10px; border-bottom:1px solid #f0f3f8;}
+  .ok{color:var(--verde); font-weight:700;}
+  .falta{color:var(--vermelho); font-weight:700;}
+  .oculto{display:none;}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="telaLogin">
+  <div class="cartao-central">
+    <div class="logo">💻</div>
+    <h2>Organização Estação Notebooks</h2>
+    <p class="sub">E.E Anna Maria — acesso restrito</p>
+    <div class="seletor-perfil">
+      <button id="btnProf" class="ativo" onclick="escolherPerfil('professor')">🧑‍🏫 Professor</button>
+      <button id="btnGestao" onclick="escolherPerfil('gestao')">🏫 Gestão Escolar</button>
+    </div>
+    <div class="erro" id="erroLogin"></div>
+    <form onsubmit="entrar(); return false;">
+      <div id="loginProfessor">
+        <div class="campo">
+          <label for="selProfessor">Professor(a)</label>
+          <select id="selProfessor"><option value="">— selecione seu nome —</option></select>
+        </div>
+      </div>
+      <div id="loginGestao" class="oculto">
+        <div class="campo">
+          <label for="inpEmailGestao">E-mail institucional</label>
+          <input type="text" id="inpEmailGestao" placeholder="gestao@eeannamaria.sp.gov.br" autocomplete="username">
+        </div>
+      </div>
+      <div class="campo">
+        <label for="inpSenha">Senha</label>
+        <input type="password" id="inpSenha" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn" type="submit" id="btnEntrar">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<!-- ================= TROCA DE SENHA (primeiro acesso) ================= -->
+<div id="telaSenha" class="oculto">
+  <div class="cartao-central">
+    <div class="logo">🔒</div>
+    <h2>Crie sua nova senha</h2>
+    <p class="sub">Por segurança, troque a senha inicial antes de continuar.</p>
+    <div class="erro" id="erroSenha"></div>
+    <form onsubmit="salvarNovaSenha(); return false;">
+      <div class="campo">
+        <label for="inpNovaSenha">Nova senha (mín. 6 caracteres)</label>
+        <input type="password" id="inpNovaSenha" autocomplete="new-password">
+      </div>
+      <div class="campo">
+        <label for="inpConfirmaSenha">Confirme a nova senha</label>
+        <input type="password" id="inpConfirmaSenha" autocomplete="new-password">
+      </div>
+      <button class="btn" type="submit">Salvar e continuar</button>
+    </form>
+  </div>
+</div>
+
+<!-- ================= PAINEL ================= -->
+<div id="telaPainel" class="oculto">
+  <header>
+    <h1>💻 Estação Notebooks — E.E Anna Maria</h1>
+    <button class="perfil" id="rotuloPerfil" onclick="sair()"></button>
+  </header>
+  <div class="painel">
+    <h2 id="tituloPainel"></h2>
+    <p class="sub" id="subPainel"></p>
+    <div class="grade-estacoes" id="gradeEstacoes"></div>
+
+    <div class="bloco-gestao oculto" id="blocoNotificacoes">
+      <h3>🔔 Alertas e observações (somente gestão)</h3>
+      <div id="listaNotificacoes"></div>
+    </div>
+    <div class="bloco-gestao oculto" id="blocoHistorico">
+      <h3>📋 Histórico de registros</h3>
+      <table>
+        <thead><tr>
+          <th>Professor(a)</th><th>Estação</th><th>Sala / Turma</th>
+          <th>Retirada</th><th>Devolução</th><th>Situação</th>
+        </tr></thead>
+        <tbody id="corpoHistorico"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL RETIRADA / DEVOLUÇÃO ================= -->
+<div class="sombra" id="sombraModal" onclick="if(event.target===this)fecharModal()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloModal">
+    <h3 id="tituloModal"></h3>
+    <p class="sub" id="subModal"></p>
+    <div class="alerta" id="alertaModal"></div>
+    <div class="campo" id="campoSala">
+      <label for="selSala">Sala / Turma da aula</label>
+      <select id="selSala"></select>
+    </div>
+    <div class="campo">
+      <label for="inpQtd" id="rotuloQtd"></label>
+      <input type="number" id="inpQtd" min="0" placeholder="conte os notebooks e digite aqui">
+    </div>
+    <div class="campo">
+      <label for="inpObs">Observações (opcional)</label>
+      <input type="text" id="inpObs" placeholder="ex.: notebook 14 não liga">
+    </div>
+    <div class="linha-botoes">
+      <button class="btn secundario" onclick="fecharModal()">Cancelar</button>
+      <button class="btn" id="btnConfirmar" onclick="confirmar()"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL DETALHES (gestão) ================= -->
+<div class="sombra" id="sombraDetalhes" onclick="if(event.target===this)fecharDetalhes()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloDetalhes">
+    <h3 id="tituloDetalhes"></h3>
+    <div id="corpoDetalhes" style="font-size:.88rem; line-height:1.9; color:#44536a; margin-bottom:12px;"></div>
+    <div id="areaResolver" class="oculto">
+      <div class="alerta visivel" style="background:#fbe3e3; color:#8c2f2f;">
+        Confira o gabinete fisicamente e informe a contagem correta para encerrar a divergência.
+      </div>
+      <div class="campo">
+        <label for="inpQtdConferida">Contagem conferida</label>
+        <input type="number" id="inpQtdConferida" min="0">
+      </div>
+      <button class="btn" onclick="resolverDivergencia()">Encerrar divergência</button>
+      <div style="height:10px"></div>
+    </div>
+    <div class="linha-botoes">
+      <button class="btn secundario" onclick="fecharDetalhes()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= ESTADO / API ================= */
+let token = localStorage.getItem('token') || null;
+let usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
+let perfilLogin = 'professor';
+let estacoes = [], salas = [];
+let estacaoAtiva = null, modoModal = 'retirada', atualizador = null;
+
+async function api(caminho, corpo){
+  const opts = { headers: { 'Content-Type': 'application/json' } };
+  if (token) opts.headers.Authorization = 'Bearer ' + token;
+  if (corpo) { opts.method = 'POST'; opts.body = JSON.stringify(corpo); }
+  const resp = await fetch('/api' + caminho, opts);
+  const dados = await resp.json().catch(() => ({}));
+  if (resp.status === 401 && caminho !== '/login') { sair(); throw new Error(dados.erro || 'Sessão expirada.'); }
+  if (!resp.ok) throw new Error(dados.erro || 'Erro no servidor.');
+  return dados;
+}
+
+function hora(iso){
+  const d = new Date(iso);
+  const hoje = new Date().toDateString() === d.toDateString();
+  const hm = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  return hoje ? hm : d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+hm;
+}
+
+/* ================= GABINETE TES GUARDIAN (SVG) ================= */
+function svgGabinete(e, visaoGestao){
+  let slots = '';
+  const total = 32;
+  const cheios = visaoGestao ? Math.round(e.qtd/e.capacidade*total) : 0;
+  for(let i=0;i<total;i++){
+    const prat = Math.floor(i/16), pos = i%16;
+    let classe;
+    if(!visaoGestao) classe = 'slot neutro';   // professor não vê a contagem real
+    else classe = i < cheios ? (e.emUso ? 'slot cheio' : 'slot cheio carregando') : 'slot vazio';
+    slots += `<rect class="${classe}" x="${40+pos*7.2}" y="${prat===0?46:96}" width="4.2" height="34" rx="1"/>`;
+  }
+  const corLed = visaoGestao && e.divergencia ? 'var(--vermelho)'
+               : e.emUso ? 'var(--amarelo)' : 'var(--verde)';
+  function furos(x0){
+    let f='';
+    for(const y0 of [52,92,132])
+      for(let l=0;l<4;l++) for(let c=0;c<5;c++)
+        f += `<circle cx="${x0+c*7}" cy="${y0+l*6}" r="1.4" fill="#9aa0a6"/>`;
+    return f;
+  }
+  return `
+  <svg class="gabinete" viewBox="-30 0 250 210">
+    <rect x="20" y="26" width="150" height="158" rx="4" fill="#d9dcdf" stroke="#b9bec3" stroke-width="2"/>
+    <rect x="28" y="34" width="134" height="144" fill="#e8eaec"/>
+    <rect x="28" y="82" width="134" height="6" fill="#c2c7cb"/>
+    <rect x="28" y="132" width="134" height="6" fill="#c2c7cb"/>
+    ${slots}
+    <rect x="28" y="170" width="134" height="8" fill="#c2c7cb"/>
+    <rect x="12" y="12" width="166" height="16" rx="3" fill="#4a4d52"/>
+    <rect x="12" y="12" width="166" height="5" rx="3" fill="#5b5e64"/>
+    <circle class="led" cx="170" cy="20" r="4" fill="${corLed}"/>
+    <text x="22" y="23" font-size="8" fill="#e8eaee" font-family="sans-serif" font-weight="bold">TES GUARDIAN</text>
+    <g class="porta-esq">
+      <rect x="20" y="30" width="73" height="152" rx="3" fill="#dfe2e5" stroke="#b9bec3" stroke-width="2"/>
+      ${furos(36)}
+    </g>
+    <g class="porta-dir">
+      <rect x="97" y="30" width="73" height="152" rx="3" fill="#dfe2e5" stroke="#b9bec3" stroke-width="2"/>
+      ${furos(113)}
+      <circle cx="160" cy="106" r="6" fill="#b0b5ba" stroke="#8a8f94" stroke-width="1.5"/>
+      <rect x="158.6" y="102" width="2.8" height="8" rx="1.2" fill="#6d7277"/>
+    </g>
+    <g fill="#7d8288">
+      <rect x="30" y="184" width="10" height="8" rx="2"/>
+      <rect x="150" y="184" width="10" height="8" rx="2"/>
+    </g>
+    <circle cx="35" cy="197" r="8" fill="#a7abaf" stroke="#7d8288" stroke-width="2"/>
+    <circle cx="155" cy="197" r="8" fill="#a7abaf" stroke="#7d8288" stroke-width="2"/>
+    <circle cx="35" cy="197" r="2.5" fill="#5b5e64"/>
+    <circle cx="155" cy="197" r="2.5" fill="#5b5e64"/>
+  </svg>`;
+}
+
+/* ================= PAINEL ================= */
+async function carregarPainel(){
+  const gestao = usuario.perfil === 'gestao';
+  estacoes = await api('/estacoes');
+  const grade = document.getElementById('gradeEstacoes');
+  const minha = !gestao ? estacoes.find(x=>x.minha) : null;
+
+  grade.innerHTML = estacoes.map(e=>{
+    let badge;
+    if(gestao && e.divergencia) badge = '<span class="badge divergencia">Divergência</span>';
+    else if(e.emUso)            badge = `<span class="badge em-uso">Em uso · Prof. ${e.professorNome}</span>`;
+    else                        badge = '<span class="badge disponivel">Disponível</span>';
+
+    const contagem = gestao
+      ? `<div class="contagem"><b>${e.qtd}</b> / ${e.capacidade} notebooks</div>`
+      : `<div class="contagem">Capacidade: <b>${e.capacidade}</b> notebooks</div>`;
+
+    let botao='';
+    if(gestao){
+      botao = `<button class="btn secundario" onclick="detalhes('${e.id}')">Ver detalhes</button>`;
+    } else if(e.minha){
+      botao = `<button class="btn" onclick="abrirModal('${e.id}','devolucao')">Registrar devolução</button>`;
+    } else if(e.emUso){
+      botao = `<button class="btn secundario" disabled>Em uso — Prof. ${e.professorNome}</button>`;
+    } else if(minha){
+      botao = `<button class="btn secundario" disabled>Retirar estação</button>
+               <div class="aviso-bloqueio">⚠ Devolva primeiro a Estação ${minha.id} para retirar outra.</div>`;
+    } else {
+      botao = `<button class="btn" onclick="abrirModal('${e.id}','retirada')">Retirar estação</button>`;
+    }
+
+    return `
+    <div class="cartao ${e.emUso?'aberto':''}" id="cartao-${e.id}">
+      <h3>Estação ${e.id}</h3>
+      <div class="local">📍 Localização atual: <b>${e.local}</b></div>
+      ${badge}
+      ${svgGabinete(e, gestao)}
+      ${contagem}
+      ${botao}
+    </div>`;
+  }).join('');
+
+  if(gestao){ await carregarGestao(); }
+}
+
+async function carregarGestao(){
+  const [notifs, regs] = await Promise.all([api('/notificacoes'), api('/registros')]);
+  document.getElementById('listaNotificacoes').innerHTML = notifs.length
+    ? notifs.map(n=>`<div class="notificacao"><span class="hora">${hora(n.criada_em)}</span><span>⚠ ${n.texto}</span></div>`).join('')
+    : '<div class="sem-notificacao">Nenhuma divergência ou observação registrada. ✅</div>';
+
+  document.getElementById('corpoHistorico').innerHTML = regs.map(r=>{
+    let situacao;
+    if(r.qtd_dev===null)           situacao = '<td>⏳ Em aula</td>';
+    else if(r.qtd_dev===r.qtd_ret) situacao = '<td class="ok">✔ OK</td>';
+    else if(r.qtd_dev<r.qtd_ret)   situacao = `<td class="falta">⚠ Falta ${r.qtd_ret-r.qtd_dev}</td>`;
+    else                           situacao = `<td class="falta">⚠ Sobra ${r.qtd_dev-r.qtd_ret}</td>`;
+    return `<tr>
+      <td>Prof. ${r.professor_nome}</td><td>${r.estacao_id}</td>
+      <td>${r.sala}${r.obs?'<br><small style="color:#9c7400">📝 '+r.obs+'</small>':''}</td>
+      <td>${r.qtd_ret} · ${hora(r.data_ret)}</td>
+      <td>${r.qtd_dev===null?'—':r.qtd_dev+' · '+hora(r.data_dev)}</td>
+      ${situacao}
+    </tr>`;
+  }).join('') || '<tr><td colspan="6">Nenhum registro ainda.</td></tr>';
+}
+
+/* ================= DETALHES / DIVERGÊNCIA (gestão) ================= */
+function detalhes(id){
+  const e = estacoes.find(x=>x.id===id);
+  document.getElementById('tituloDetalhes').textContent = 'Estação '+e.id;
+  document.getElementById('corpoDetalhes').innerHTML =
+    `📍 <b>Localização:</b> ${e.local}<br>`
+    + `💻 <b>Notebooks:</b> ${e.qtd} / ${e.capacidade}<br>`
+    + (e.emUso ? `🧑‍🏫 <b>Em uso por:</b> Prof. ${e.professorNome} (${e.sala})<br>` : '✅ Disponível na Sala de Informática<br>')
+    + (e.divergencia ? '<span style="color:var(--vermelho)">⚠ <b>Há divergência de contagem registrada.</b></span>' : '');
+  document.getElementById('areaResolver').classList.toggle('oculto', !e.divergencia);
+  document.getElementById('inpQtdConferida').value = '';
+  estacaoAtiva = e;
+  document.getElementById('sombraDetalhes').classList.add('visivel');
+}
+function fecharDetalhes(){ document.getElementById('sombraDetalhes').classList.remove('visivel'); }
+
+async function resolverDivergencia(){
+  try{
+    const qtd = Number(document.getElementById('inpQtdConferida').value);
+    await api(`/estacoes/${estacaoAtiva.id}/resolver-divergencia`, { qtd });
+    fecharDetalhes(); toast('✅ Divergência encerrada.');
+    await carregarPainel();
+  }catch(err){ toast('⚠ '+err.message); }
+}
+
+/* ================= LOGIN / SESSÃO ================= */
+function escolherPerfil(p){
+  perfilLogin = p;
+  document.getElementById('btnProf').classList.toggle('ativo', p==='professor');
+  document.getElementById('btnGestao').classList.toggle('ativo', p==='gestao');
+  document.getElementById('loginProfessor').classList.toggle('oculto', p!=='professor');
+  document.getElementById('loginGestao').classList.toggle('oculto', p!=='gestao');
+  document.getElementById('erroLogin').classList.remove('visivel');
+}
+
+async function entrar(){
+  const erro = document.getElementById('erroLogin');
+  const btn = document.getElementById('btnEntrar');
+  erro.classList.remove('visivel');
+  btn.disabled = true; btn.textContent = 'Entrando…';
+  try{
+    const corpo = { perfil: perfilLogin, senha: document.getElementById('inpSenha').value };
+    if(perfilLogin==='professor') corpo.professorId = Number(document.getElementById('selProfessor').value)||null;
+    else corpo.email = document.getElementById('inpEmailGestao').value;
+    const r = await api('/login', corpo);
+    token = r.token; usuario = r.usuario;
+    localStorage.setItem('token', token);
+    localStorage.setItem('usuario', JSON.stringify(usuario));
+    document.getElementById('inpSenha').value='';
+    if(usuario.trocarSenha) mostrarTelaSenha(); else abrirPainel();
+  }catch(err){
+    erro.textContent = err.message; erro.classList.add('visivel');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Entrar';
+  }
+}
+
+function mostrarTelaSenha(){
+  document.getElementById('telaLogin').classList.add('oculto');
+  document.getElementById('telaSenha').classList.remove('oculto');
+}
+
+async function salvarNovaSenha(){
+  const erro = document.getElementById('erroSenha');
+  erro.classList.remove('visivel');
+  const s1 = document.getElementById('inpNovaSenha').value;
+  const s2 = document.getElementById('inpConfirmaSenha').value;
+  if(s1.length < 6){ erro.textContent='A senha deve ter pelo menos 6 caracteres.'; erro.classList.add('visivel'); return; }
+  if(s1 !== s2){ erro.textContent='As senhas não conferem.'; erro.classList.add('visivel'); return; }
+  try{
+    await api('/trocar-senha', { novaSenha: s1 });
+    usuario.trocarSenha = false;
+    localStorage.setItem('usuario', JSON.stringify(usuario));
+    document.getElementById('telaSenha').classList.add('oculto');
+    toast('✅ Senha alterada com sucesso!');
+    abrirPainel();
+  }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
+}
+
+async function abrirPainel(){
+  document.getElementById('telaLogin').classList.add('oculto');
+  document.getElementById('telaPainel').classList.remove('oculto');
+  const gestao = usuario.perfil==='gestao';
+  document.getElementById('rotuloPerfil').textContent = gestao
+    ? '🏫 Gestão Escolar · sair' : `🧑‍🏫 Prof. ${usuario.nome} · sair`;
+  document.getElementById('tituloPainel').textContent = gestao
+    ? 'Painel das estações' : `Olá, Prof. ${usuario.nome}! (${usuario.materia})`;
+  document.getElementById('subPainel').textContent = gestao
+    ? 'Acompanhe em tempo real o estado dos 3 gabinetes TES Guardian.'
+    : 'Use o botão de cada estação para registrar a retirada ou a devolução dos notebooks.';
+  document.getElementById('blocoNotificacoes').classList.toggle('oculto', !gestao);
+  document.getElementById('blocoHistorico').classList.toggle('oculto', !gestao);
+  try{
+    if(!salas.length) salas = await api('/salas');
+    const sel = document.getElementById('selSala');
+    sel.innerHTML = '<option value="">— selecione a sala —</option>'
+      + salas.map(s=>`<option value="${s.id}">${s.id} — ${s.turmas}</option>`).join('');
+    await carregarPainel();
+  }catch(err){ toast('⚠ '+err.message); }
+  clearInterval(atualizador);
+  atualizador = setInterval(()=>{ carregarPainel().catch(()=>{}); }, 15000);
+}
+
+function sair(){
+  clearInterval(atualizador);
+  token = null; usuario = null;
+  localStorage.removeItem('token'); localStorage.removeItem('usuario');
+  document.getElementById('telaPainel').classList.add('oculto');
+  document.getElementById('telaSenha').classList.add('oculto');
+  document.getElementById('telaLogin').classList.remove('oculto');
+}
+
+/* ================= MODAL RETIRADA / DEVOLUÇÃO ================= */
+function abrirModal(id, modo){
+  estacaoAtiva = estacoes.find(x=>x.id===id);
+  modoModal = modo;
+  const retirada = modo==='retirada';
+  document.getElementById('tituloModal').textContent = (retirada?'Retirada':'Devolução')+' — Estação '+id;
+  document.getElementById('subModal').textContent = retirada
+    ? 'Conte os notebooks no gabinete e informe a quantidade encontrada.'
+    : 'Ao final da aula, conte e informe quantos notebooks foram devolvidos ao gabinete.';
+  document.getElementById('rotuloQtd').textContent = retirada
+    ? 'Quantidade de notebooks encontrados na estação'
+    : 'Quantidade de notebooks devolvidos à estação';
+  document.getElementById('campoSala').style.display = retirada?'block':'none';
+  document.getElementById('btnConfirmar').textContent = retirada?'Confirmar retirada':'Confirmar devolução';
+  document.getElementById('inpQtd').value=''; document.getElementById('inpObs').value='';
+  document.getElementById('inpQtd').max = estacaoAtiva.capacidade;
+  document.getElementById('selSala').value='';
+  document.getElementById('alertaModal').classList.remove('visivel');
+  document.getElementById('sombraModal').classList.add('visivel');
+  document.getElementById(retirada?'selSala':'inpQtd').focus();
+}
+function fecharModal(){ document.getElementById('sombraModal').classList.remove('visivel'); }
+
+async function confirmar(){
+  const alerta = document.getElementById('alertaModal');
+  alerta.classList.remove('visivel');
+  const corpo = {
+    qtd: Number(document.getElementById('inpQtd').value),
+    obs: document.getElementById('inpObs').value.trim() || undefined,
+  };
+  if(document.getElementById('inpQtd').value===''){
+    alerta.textContent='Informe a quantidade de notebooks para continuar.';
+    alerta.classList.add('visivel'); return;
+  }
+  if(modoModal==='retirada') corpo.sala = document.getElementById('selSala').value;
+  try{
+    const r = await api(`/estacoes/${estacaoAtiva.id}/${modoModal}`, corpo);
+    fecharModal();
+    toast('✅ '+r.mensagem);
+    await carregarPainel();
+  }catch(err){
+    alerta.textContent = err.message; alerta.classList.add('visivel');
+  }
+}
+
+/* ================= UTILIDADES ================= */
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  clearTimeout(toastTimer);
+  t.textContent = msg; t.classList.add('visivel');
+  toastTimer = setTimeout(()=>t.classList.remove('visivel'), 3200);
+}
+
+/* ================= INICIALIZAÇÃO ================= */
+(async function iniciar(){
+  document.addEventListener('keydown', ev=>{
+    if(ev.key==='Escape'){ fecharModal(); fecharDetalhes(); }
+  });
+  try{
+    const profs = await api('/professores');
+    const sel = document.getElementById('selProfessor');
+    profs.forEach(p=>{
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = `${p.nome} — ${p.materia}`;
+      sel.appendChild(o);
+    });
+  }catch{ /* servidor fora do ar: a tela de login ainda aparece */ }
+  // Sessão salva: volta direto ao painel
+  if(token && usuario){
+    if(usuario.trocarSenha) mostrarTelaSenha(); else abrirPainel();
+  }
+})();
+</script>
+</body>
+</html>
