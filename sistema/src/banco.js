@@ -19,6 +19,17 @@ const SALAS = [
   { id: 'Sala 9', turmas: '9º A' },
 ];
 
+// Recursos que podem ser agendados com antecedência
+const RECURSOS = [
+  { id: 'sala_informatica', nome: 'Sala de Informática (turma toda)' },
+  { id: 'estacao_A', nome: 'Estação A (carrinho móvel)' },
+  { id: 'estacao_B', nome: 'Estação B (carrinho móvel)' },
+  { id: 'estacao_C', nome: 'Estação C (carrinho móvel)' },
+];
+
+// Cargos administrativos que a gestão pode cadastrar (além da própria Gestão)
+const CARGOS_ADMIN = ['Gestão Escolar', 'Diretor(a)', 'Vice-Diretor(a)', 'CGPAC', 'Estagiário(a)'];
+
 // Professores extraídos dos horários 2026 (Anos Finais + Ensino Médio)
 const PROFESSORES = [
   ['Alex',      'Geografia / Filosofia / Projeto de Vida'],
@@ -79,6 +90,7 @@ const TABELAS = [
     senha_hash    TEXT NOT NULL,
     perfil        TEXT NOT NULL CHECK (perfil IN ('professor','gestao')),
     materia       TEXT,
+    cargo         TEXT,
     ativo         INTEGER NOT NULL DEFAULT 1,
     troca_senha   INTEGER NOT NULL DEFAULT 1
   )`,
@@ -109,10 +121,53 @@ const TABELAS = [
     texto         TEXT NOT NULL,
     criada_em     TEXT NOT NULL
   )`,
+  // Agendamento antecipado — cobre tanto "Sala de Informática" (turma toda)
+  // quanto reserva futura de uma Estação (A/B/C) para depois retirada imediata.
+  `CREATE TABLE IF NOT EXISTS agendamentos (
+    id            ${ID_AUTO},
+    usuario_id    INTEGER NOT NULL REFERENCES usuarios(id),
+    recurso       TEXT NOT NULL,
+    data          TEXT NOT NULL,
+    hora_inicio   TEXT NOT NULL,
+    hora_fim      TEXT NOT NULL,
+    sala          TEXT,
+    turma         TEXT,
+    observacao    TEXT,
+    status        TEXT NOT NULL DEFAULT 'confirmado' CHECK (status IN ('confirmado','cancelado')),
+    criado_em     TEXT NOT NULL
+  )`,
+  // Pedidos de recuperação de senha feitos por quem está deslogado.
+  // A gestão atende manualmente (gera uma senha temporária e repassa ao usuário).
+  `CREATE TABLE IF NOT EXISTS redefinicoes_senha (
+    id            ${ID_AUTO},
+    usuario_id    INTEGER NOT NULL REFERENCES usuarios(id),
+    criado_em     TEXT NOT NULL,
+    atendida      INTEGER NOT NULL DEFAULT 0,
+    atendida_em   TEXT
+  )`,
 ];
+
+// Pequenas migrações para bancos já existentes (adiciona coluna se faltar).
+async function migrar() {
+  try {
+    if (usaPostgres) await run('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cargo TEXT');
+    else await run('ALTER TABLE usuarios ADD COLUMN cargo TEXT');
+  } catch (e) {
+    if (!/duplicate column|already exists/i.test(e.message)) throw e;
+  }
+}
+
+function gerarSenhaTemporaria() {
+  // 8 caracteres fáceis de ditar por telefone/presencialmente (sem 0/O/1/I confusos)
+  const alfabeto = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 8; i++) s += alfabeto[Math.floor(Math.random() * alfabeto.length)];
+  return s;
+}
 
 async function inicializar() {
   for (const sql of TABELAS) await run(sql);
+  await migrar();
 
   const temUsuarios = Number((await get('SELECT COUNT(*) AS n FROM usuarios')).n) > 0;
   if (!temUsuarios) {
@@ -120,11 +175,11 @@ async function inicializar() {
     const SENHA_INICIAL_GESTAO = 'gestao123';
 
     for (const [nome, materia] of PROFESSORES) {
-      await run('INSERT INTO usuarios (nome, email, senha_hash, perfil, materia) VALUES (?, ?, ?, ?, ?)',
-        [nome, null, bcrypt.hashSync(SENHA_INICIAL_PROF, 10), 'professor', materia]);
+      await run('INSERT INTO usuarios (nome, email, senha_hash, perfil, materia, cargo) VALUES (?, ?, ?, ?, ?, ?)',
+        [nome, null, bcrypt.hashSync(SENHA_INICIAL_PROF, 10), 'professor', materia, null]);
     }
-    await run('INSERT INTO usuarios (nome, email, senha_hash, perfil, materia) VALUES (?, ?, ?, ?, ?)',
-      ['Gestão Escolar', 'gestao@eeannamaria.sp.gov.br', bcrypt.hashSync(SENHA_INICIAL_GESTAO, 10), 'gestao', null]);
+    await run('INSERT INTO usuarios (nome, email, senha_hash, perfil, materia, cargo) VALUES (?, ?, ?, ?, ?, ?)',
+      ['Gestão Escolar', 'gestao@eeannamaria.sp.gov.br', bcrypt.hashSync(SENHA_INICIAL_GESTAO, 10), 'gestao', null, 'Gestão Escolar']);
 
     for (const [id, cap] of [['A', 32], ['B', 32], ['C', 30]]) {
       await run('INSERT INTO estacoes (id, capacidade, qtd, local) VALUES (?, ?, ?, ?)',
@@ -139,4 +194,8 @@ async function inicializar() {
   console.log(`[banco] Modo: ${usaPostgres ? 'PostgreSQL (nuvem)' : 'SQLite (local — escola.db)'}`);
 }
 
-module.exports = { inicializar, all, get, run, SALAS, LOCAL_PADRAO };
+module.exports = {
+  inicializar, all, get, run,
+  SALAS, RECURSOS, CARGOS_ADMIN, LOCAL_PADRAO,
+  gerarSenhaTemporaria,
+};
