@@ -3,12 +3,21 @@
 //   1. Professor nunca recebe dados de divergência nem contagem real.
 //   2. Professor só retira nova estação após devolver a atual.
 //   3. Localização: em uso = sala da aula; devolvida = Sala de Informática.
+//   4. Contas administrativas (Gestão, Diretor, Vice-Diretor, CGPAC, Estagiário)
+//      têm as mesmas permissões de gestão — diferenciadas apenas pelo "cargo" exibido.
+//   5. Redefinição de senha nunca é automática por e-mail (a escola não tem esse
+//      serviço configurado): o pedido cai numa fila e a gestão atende manualmente,
+//      gerando uma senha temporária para repassar ao professor.
 const path = require('node:path');
 const crypto = require('node:crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { inicializar, all, get, run, SALAS, LOCAL_PADRAO } = require('./banco');
+const {
+  inicializar, all, get, run,
+  SALAS, RECURSOS, CARGOS_ADMIN, LOCAL_PADRAO,
+  gerarSenhaTemporaria,
+} = require('./banco');
 
 const app = express();
 // Render/Railway definem PORT; localmente usamos 3000
@@ -17,7 +26,7 @@ const PORTA = process.env.PORT || process.env.PORTA || 3000;
 // gerado a cada reinício (os logins caem quando o servidor reinicia).
 const SEGREDO = process.env.JWT_SEGREDO || crypto.randomBytes(32).toString('hex');
 
-app.use(express.json());
+app.use(express.json({ limit: '2mb' })); // limite maior: permite colar planilhas CSV no corpo
 app.use(express.static(path.join(__dirname, '..', 'publico')));
 
 const agora = () => new Date().toISOString();
@@ -55,6 +64,8 @@ app.get('/api/professores', rota(async (_req, res) => {
 }));
 
 app.get('/api/salas', (_req, res) => res.json(SALAS));
+app.get('/api/recursos', (_req, res) => res.json(RECURSOS));
+app.get('/api/cargos', (_req, res) => res.json(CARGOS_ADMIN));
 
 app.post('/api/login', rota(async (req, res) => {
   const { perfil, professorId, email, senha } = req.body || {};
@@ -77,7 +88,7 @@ app.post('/api/login', rota(async (req, res) => {
     token,
     usuario: {
       id: usuario.id, nome: usuario.nome, perfil: usuario.perfil,
-      materia: usuario.materia, trocarSenha: !!usuario.troca_senha,
+      materia: usuario.materia, cargo: usuario.cargo, trocarSenha: !!usuario.troca_senha,
     },
   });
 }));
@@ -97,6 +108,94 @@ app.post('/api/trocar-senha', exigirLogin, rota(async (req, res) => {
   await run('UPDATE usuarios SET senha_hash=?, troca_senha=0 WHERE id=?',
     [bcrypt.hashSync(String(novaSenha), 10), req.usuario.id]);
   res.json({ ok: true });
+}));
+
+// ---------- Recuperação de senha (usuário deslogado) ----------
+// Sem serviço de e-mail configurado na escola: o pedido entra numa fila e a
+// gestão atende manualmente, gerando uma senha temporária para repassar.
+app.post('/api/recuperar-senha', rota(async (req, res) => {
+  const { perfil, professorId, email } = req.body || {};
+  let usuario = null;
+  if (perfil === 'professor' && professorId) {
+    usuario = await get("SELECT * FROM usuarios WHERE id=? AND perfil='professor' AND ativo=1", [professorId]);
+  } else if (email) {
+    usuario = await get("SELECT * FROM usuarios WHERE email=? AND perfil='gestao' AND ativo=1",
+      [String(email).trim().toLowerCase()]);
+  }
+  // Resposta genérica sempre — não revela se o usuário existe ou não
+  if (usuario) {
+    await run('INSERT INTO redefinicoes_senha (usuario_id, criado_em) VALUES (?, ?)', [usuario.id, agora()]);
+    await notificarGestao(`Pedido de redefinição de senha — ${usuario.nome} (${usuario.perfil === 'gestao' ? usuario.cargo || 'Gestão' : 'Professor(a)'}).`);
+  }
+  res.json({ ok: true, mensagem: 'Pedido enviado. Procure a gestão/direção para receber sua nova senha temporária.' });
+}));
+
+app.get('/api/redefinicoes-pendentes', exigirLogin, exigirGestao, rota(async (_req, res) => {
+  res.json(await all(`
+    SELECT rs.id, rs.criado_em, u.id AS usuario_id, u.nome, u.perfil, u.cargo
+    FROM redefinicoes_senha rs JOIN usuarios u ON u.id = rs.usuario_id
+    WHERE rs.atendida = 0
+    ORDER BY rs.id DESC
+  `));
+}));
+
+app.post('/api/redefinicoes/:id/atender', exigirLogin, exigirGestao, rota(async (req, res) => {
+  const pedido = await get('SELECT * FROM redefinicoes_senha WHERE id=?', [req.params.id]);
+  if (!pedido) return res.status(404).json({ erro: 'Pedido não encontrado.' });
+  if (pedido.atendida) return res.status(409).json({ erro: 'Este pedido já foi atendido.' });
+
+  const usuario = await get('SELECT * FROM usuarios WHERE id=?', [pedido.usuario_id]);
+  const senhaTemp = gerarSenhaTemporaria();
+  await run('UPDATE usuarios SET senha_hash=?, troca_senha=1 WHERE id=?',
+    [bcrypt.hashSync(senhaTemp, 10), usuario.id]);
+  await run('UPDATE redefinicoes_senha SET atendida=1, atendida_em=? WHERE id=?', [agora(), pedido.id]);
+
+  res.json({ ok: true, nome: usuario.nome, senhaTemp });
+}));
+
+// ---------- Contas de usuários (gestão) ----------
+app.get('/api/usuarios', exigirLogin, exigirGestao, rota(async (_req, res) => {
+  res.json(await all(
+    'SELECT id, nome, email, perfil, materia, cargo, ativo FROM usuarios ORDER BY perfil DESC, nome'
+  ));
+}));
+
+// Criar conta administrativa: Diretor(a), Vice-Diretor(a), CGPAC, Estagiário(a), Gestão
+app.post('/api/usuarios/admin', exigirLogin, exigirGestao, rota(async (req, res) => {
+  const { nome, email, cargo } = req.body || {};
+  if (!nome || !String(nome).trim()) return res.status(400).json({ erro: 'Informe o nome.' });
+  if (!email || !String(email).includes('@')) return res.status(400).json({ erro: 'Informe um e-mail institucional válido.' });
+  if (!CARGOS_ADMIN.includes(cargo)) {
+    return res.status(400).json({ erro: `Cargo inválido. Use um de: ${CARGOS_ADMIN.join(', ')}.` });
+  }
+  const existe = await get('SELECT id FROM usuarios WHERE email=?', [String(email).trim().toLowerCase()]);
+  if (existe) return res.status(409).json({ erro: 'Já existe uma conta com este e-mail.' });
+
+  const senhaTemp = gerarSenhaTemporaria();
+  await run(
+    'INSERT INTO usuarios (nome, email, senha_hash, perfil, materia, cargo) VALUES (?, ?, ?, ?, ?, ?)',
+    [String(nome).trim(), String(email).trim().toLowerCase(), bcrypt.hashSync(senhaTemp, 10), 'gestao', null, cargo]
+  );
+  res.json({ ok: true, senhaTemp });
+}));
+
+// Resetar a senha de qualquer usuário (iniciado pela gestão, sem pedido prévio)
+app.post('/api/usuarios/:id/resetar-senha', exigirLogin, exigirGestao, rota(async (req, res) => {
+  const usuario = await get('SELECT * FROM usuarios WHERE id=?', [req.params.id]);
+  if (!usuario) return res.status(404).json({ erro: 'Usuário não encontrado.' });
+  const senhaTemp = gerarSenhaTemporaria();
+  await run('UPDATE usuarios SET senha_hash=?, troca_senha=1 WHERE id=?',
+    [bcrypt.hashSync(senhaTemp, 10), usuario.id]);
+  res.json({ ok: true, nome: usuario.nome, senhaTemp });
+}));
+
+// Ativar/desativar conta (bloqueia login sem apagar o histórico)
+app.post('/api/usuarios/:id/alternar-ativo', exigirLogin, exigirGestao, rota(async (req, res) => {
+  const usuario = await get('SELECT * FROM usuarios WHERE id=?', [req.params.id]);
+  if (!usuario) return res.status(404).json({ erro: 'Usuário não encontrado.' });
+  if (usuario.id === req.usuario.id) return res.status(400).json({ erro: 'Você não pode desativar a própria conta.' });
+  await run('UPDATE usuarios SET ativo=? WHERE id=?', [usuario.ativo ? 0 : 1, usuario.id]);
+  res.json({ ok: true, ativo: !usuario.ativo });
 }));
 
 // ---------- Estações ----------
@@ -189,6 +288,85 @@ app.post('/api/estacoes/:id/devolucao', exigirLogin, exigirProfessor, rota(async
   res.json({ ok: true, mensagem: 'Devolução registrada. Obrigado!' });
 }));
 
+// Edição direta de capacidade/quantidade pela gestão (fora do fluxo de divergência)
+app.put('/api/estacoes/:id', exigirLogin, exigirGestao, rota(async (req, res) => {
+  const e = await get('SELECT * FROM estacoes WHERE id=?', [req.params.id]);
+  if (!e) return res.status(404).json({ erro: 'Estação não encontrada.' });
+  if (e.em_uso) return res.status(409).json({ erro: 'Não é possível editar uma estação em uso. Aguarde a devolução.' });
+
+  const capacidade = Number(req.body?.capacidade);
+  const qtd = Number(req.body?.qtd);
+  if (!Number.isInteger(capacidade) || capacidade < 1) {
+    return res.status(400).json({ erro: 'Capacidade deve ser um número inteiro maior que zero.' });
+  }
+  if (!Number.isInteger(qtd) || qtd < 0 || qtd > capacidade) {
+    return res.status(400).json({ erro: `Quantidade deve ser um número inteiro entre 0 e ${capacidade}.` });
+  }
+  await run('UPDATE estacoes SET capacidade=?, qtd=?, divergencia=0 WHERE id=?', [capacidade, qtd, e.id]);
+  await notificarGestao(`Estação ${e.id} — capacidade/quantidade ajustadas manualmente pela gestão para ${qtd}/${capacidade}.`);
+  res.json({ ok: true });
+}));
+
+// Importação de planilha (CSV colado como texto): id,capacidade,qtd
+// Ex.:
+//   id,capacidade,qtd
+//   A,32,30
+//   B,32,32
+//   C,30,28
+app.post('/api/estacoes/importar', exigirLogin, exigirGestao, rota(async (req, res) => {
+  const csv = String(req.body?.csv || '').trim();
+  if (!csv) return res.status(400).json({ erro: 'Cole o conteúdo da planilha (CSV) no campo indicado.' });
+
+  const linhas = csv.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (linhas[0] && /^id[,;]/i.test(linhas[0])) linhas.shift(); // remove cabeçalho, se houver
+
+  const atualizadas = [];
+  const ignoradas = [];
+  for (const linha of linhas) {
+    const [idBruto, capBruta, qtdBruta] = linha.split(/[,;]/).map(v => (v || '').trim());
+    const id = (idBruto || '').toUpperCase();
+    const capacidade = Number(capBruta);
+    const qtd = Number(qtdBruta);
+    const estacao = await get('SELECT * FROM estacoes WHERE id=?', [id]);
+    if (!estacao) { ignoradas.push(`${linha} (estação "${id}" não existe)`); continue; }
+    if (estacao.em_uso) { ignoradas.push(`${linha} (Estação ${id} está em uso — pulei)`); continue; }
+    if (!Number.isInteger(capacidade) || capacidade < 1 || !Number.isInteger(qtd) || qtd < 0 || qtd > capacidade) {
+      ignoradas.push(`${linha} (capacidade/quantidade inválidas)`); continue;
+    }
+    await run('UPDATE estacoes SET capacidade=?, qtd=?, divergencia=0 WHERE id=?', [capacidade, qtd, id]);
+    atualizadas.push(id);
+  }
+  if (atualizadas.length) {
+    await notificarGestao(`Importação de planilha — estações atualizadas: ${atualizadas.join(', ')}.`);
+  }
+  res.json({ ok: true, atualizadas, ignoradas });
+}));
+
+// ---------- Relatórios ----------
+app.get('/api/relatorios/uso-professores', exigirLogin, exigirGestao, rota(async (_req, res) => {
+  const linhas = await all(`
+    SELECT r.usuario_id, u.nome, r.estacao_id, COUNT(*) AS qtd
+    FROM registros r JOIN usuarios u ON u.id = r.usuario_id
+    GROUP BY r.usuario_id, u.nome, r.estacao_id
+    ORDER BY u.nome
+  `);
+  const porProfessor = new Map();
+  for (const l of linhas) {
+    if (!porProfessor.has(l.usuario_id)) {
+      porProfessor.set(l.usuario_id, { professorId: l.usuario_id, nome: l.nome, total: 0, porEstacao: {} });
+    }
+    const p = porProfessor.get(l.usuario_id);
+    p.porEstacao[l.estacao_id] = Number(l.qtd);
+    p.total += Number(l.qtd);
+  }
+  const resultado = [...porProfessor.values()].map(p => {
+    let estacaoMaisUsada = null, max = -1;
+    for (const [est, n] of Object.entries(p.porEstacao)) if (n > max) { max = n; estacaoMaisUsada = est; }
+    return { ...p, estacaoMaisUsada };
+  }).sort((a, b) => b.total - a.total);
+  res.json(resultado);
+}));
+
 // ---------- Painel da gestão ----------
 app.get('/api/registros', exigirLogin, exigirGestao, rota(async (_req, res) => {
   res.json(await all(`
@@ -212,6 +390,65 @@ app.post('/api/estacoes/:id/resolver-divergencia', exigirLogin, exigirGestao, ro
   }
   await run('UPDATE estacoes SET divergencia=0, qtd=? WHERE id=?', [qtd, e.id]);
   await notificarGestao(`Estação ${e.id} — divergência resolvida pela gestão. Contagem conferida: ${qtd}.`);
+  res.json({ ok: true });
+}));
+
+// ---------- Agendamentos (Sala de Informática e reserva antecipada de Estação) ----------
+app.get('/api/agendamentos', exigirLogin, rota(async (req, res) => {
+  const { de, ate } = req.query;
+  const condicoes = ["a.status='confirmado'"];
+  const params = [];
+  if (de) { condicoes.push('a.data >= ?'); params.push(de); }
+  if (ate) { condicoes.push('a.data <= ?'); params.push(ate); }
+  const linhas = await all(`
+    SELECT a.*, u.nome AS professor_nome
+    FROM agendamentos a JOIN usuarios u ON u.id = a.usuario_id
+    WHERE ${condicoes.join(' AND ')}
+    ORDER BY a.data, a.hora_inicio
+  `, params);
+  res.json(linhas.map(a => ({
+    id: a.id, recurso: a.recurso, data: a.data,
+    horaInicio: a.hora_inicio, horaFim: a.hora_fim,
+    sala: a.sala, turma: a.turma, observacao: a.observacao,
+    professorNome: a.professor_nome, minha: a.usuario_id === req.usuario.id,
+  })));
+}));
+
+app.post('/api/agendamentos', exigirLogin, rota(async (req, res) => {
+  const { recurso, data, horaInicio, horaFim, sala, turma, observacao } = req.body || {};
+  if (!RECURSOS.some(r => r.id === recurso)) return res.status(400).json({ erro: 'Selecione o que deseja agendar.' });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) return res.status(400).json({ erro: 'Informe uma data válida.' });
+  if (!/^\d{2}:\d{2}$/.test(horaInicio || '') || !/^\d{2}:\d{2}$/.test(horaFim || '') || horaInicio >= horaFim) {
+    return res.status(400).json({ erro: 'Informe um horário de início e fim válidos (fim depois do início).' });
+  }
+  if (recurso === 'sala_informatica' && !SALAS.some(s => s.id === sala) && !turma) {
+    return res.status(400).json({ erro: 'Informe a turma que usará a Sala de Informática.' });
+  }
+
+  const conflito = await get(`
+    SELECT a.id, u.nome FROM agendamentos a JOIN usuarios u ON u.id = a.usuario_id
+    WHERE a.recurso=? AND a.data=? AND a.status='confirmado'
+      AND a.hora_inicio < ? AND a.hora_fim > ?
+  `, [recurso, data, horaFim, horaInicio]);
+  if (conflito) {
+    return res.status(409).json({ erro: `Horário já reservado por Prof. ${conflito.nome} nesse período. Escolha outro horário.` });
+  }
+
+  await run(
+    `INSERT INTO agendamentos (usuario_id, recurso, data, hora_inicio, hora_fim, sala, turma, observacao, status, criado_em)
+     VALUES (?,?,?,?,?,?,?,?, 'confirmado', ?)`,
+    [req.usuario.id, recurso, data, horaInicio, horaFim, sala || null, turma || null, observacao || null, agora()]
+  );
+  res.json({ ok: true, mensagem: 'Agendamento confirmado.' });
+}));
+
+app.post('/api/agendamentos/:id/cancelar', exigirLogin, rota(async (req, res) => {
+  const ag = await get('SELECT * FROM agendamentos WHERE id=?', [req.params.id]);
+  if (!ag) return res.status(404).json({ erro: 'Agendamento não encontrado.' });
+  if (ag.usuario_id !== req.usuario.id && req.usuario.perfil !== 'gestao') {
+    return res.status(403).json({ erro: 'Você só pode cancelar os próprios agendamentos.' });
+  }
+  await run("UPDATE agendamentos SET status='cancelado' WHERE id=?", [ag.id]);
   res.json({ ok: true });
 }));
 
