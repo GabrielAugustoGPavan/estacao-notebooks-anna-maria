@@ -29,25 +29,38 @@
   .cartao-central p.sub{text-align:center; font-size:.82rem; color:#7a8694; margin:4px 0 22px;}
   .campo{margin-bottom:14px;}
   .campo label{display:block; font-size:.8rem; font-weight:600; margin-bottom:5px; color:#44536a;}
-  .campo input, .campo select{width:100%; padding:11px 12px; border:1.5px solid #d5dde7;
-        border-radius:9px; font-size:.92rem; background:#fbfcfe;}
-  .campo input:focus, .campo select:focus{outline:none; border-color:var(--azul);}
+  .campo input, .campo select, .campo textarea{width:100%; padding:11px 12px; border:1.5px solid #d5dde7;
+        border-radius:9px; font-size:.92rem; background:#fbfcfe; font-family:inherit;}
+  .campo textarea{resize:vertical; min-height:90px; font-family:ui-monospace,Consolas,monospace; font-size:.82rem;}
+  .campo input:focus, .campo select:focus, .campo textarea:focus{outline:none; border-color:var(--azul);}
   .btn{width:100%; padding:12px; background:var(--azul); color:#fff; border:none;
        border-radius:9px; font-size:.98rem; font-weight:600; cursor:pointer; transition:.2s;}
   .btn:hover{background:var(--azul-escuro);}
   .btn.secundario{background:#e8edf4; color:var(--azul-escuro);}
+  .btn.perigo{background:#fbe3e3; color:#8c2f2f;}
+  .btn.pequeno{width:auto; padding:7px 14px; font-size:.78rem;}
   .btn:disabled{background:#e8edf4; color:#9aa6b5; cursor:not-allowed;}
+  .link-simples{background:none; border:none; color:var(--azul); font-size:.8rem; cursor:pointer;
+        text-decoration:underline; font-family:inherit; display:block; margin:10px auto 0;}
   .seletor-perfil{display:flex; gap:8px; margin-bottom:18px;}
   .seletor-perfil button{flex:1; padding:10px; border:1.5px solid #d5dde7; background:#fff;
         border-radius:9px; font-size:.85rem; cursor:pointer; font-weight:600; color:#66748a;}
   .seletor-perfil button.ativo{border-color:var(--azul); background:#e9f1fb; color:var(--azul);}
   .erro{color:var(--vermelho); font-size:.8rem; text-align:center; margin-bottom:10px; display:none;}
   .erro.visivel{display:block;}
+  .ok-msg{color:var(--verde); font-size:.8rem; text-align:center; margin-bottom:10px; display:none;}
+  .ok-msg.visivel{display:block;}
 
   .painel{max-width:1060px; margin:0 auto; padding:22px 16px 60px;}
   .painel h2{font-size:1.05rem; color:var(--azul-escuro); margin-bottom:4px;}
   .painel p.sub{font-size:.83rem; color:#7a8694; margin-bottom:20px;}
   .grade-estacoes{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px;}
+
+  .abas{display:flex; gap:6px; margin-bottom:20px; flex-wrap:wrap; border-bottom:1.5px solid #dbe2ea;}
+  .abas button{padding:10px 16px; border:none; background:none; font-size:.85rem; font-weight:600;
+        color:#7a8694; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-1.5px;
+        font-family:inherit;}
+  .abas button.ativo{color:var(--azul); border-bottom-color:var(--azul);}
 
   .cartao{background:#fff; border-radius:14px; padding:20px;
           box-shadow:0 4px 18px rgba(20,61,115,.08); text-align:center;}
@@ -79,16 +92,17 @@
   @keyframes brilho{0%,100%{opacity:1;}50%{opacity:.45;}}
 
   .sombra{position:fixed; inset:0; background:rgba(15,30,50,.55); display:none;
-          align-items:center; justify-content:center; padding:16px; z-index:50;}
+          align-items:center; justify-content:center; padding:16px; z-index:50; overflow-y:auto;}
   .sombra.visivel{display:flex;}
-  .modal{background:#fff; border-radius:14px; padding:26px 24px; width:100%; max-width:400px;
-         animation:surgir .25s ease;}
+  .modal{background:#fff; border-radius:14px; padding:26px 24px; width:100%; max-width:420px;
+         animation:surgir .25s ease; margin:auto;}
   @keyframes surgir{from{transform:translateY(18px); opacity:0;} to{transform:none; opacity:1;}}
   .modal h3{color:var(--azul-escuro); font-size:1.02rem; margin-bottom:4px;}
   .modal p.sub{font-size:.8rem; color:#7a8694; margin-bottom:18px;}
   .alerta{background:#fdf3d7; color:#9c7400; font-size:.8rem; padding:10px 12px;
           border-radius:8px; margin-bottom:12px; display:none;}
   .alerta.visivel{display:block;}
+  .alerta.bom{background:#e2f5ea; color:#1e7a44;}
   .linha-botoes{display:flex; gap:10px; margin-top:6px;}
 
   .toast{position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(80px);
@@ -100,16 +114,25 @@
   .bloco-gestao{margin-top:26px; background:#fff; border-radius:14px; padding:20px;
              box-shadow:0 4px 18px rgba(20,61,115,.08); overflow-x:auto;}
   .bloco-gestao h3{font-size:.95rem; color:var(--azul-escuro); margin-bottom:12px;}
+  .bloco-gestao p.explic{font-size:.78rem; color:#8a95a3; margin:-6px 0 14px;}
   .notificacao{background:#fbe3e3; color:#8c2f2f; font-size:.82rem; padding:10px 14px;
                border-radius:9px; margin-bottom:8px; display:flex; gap:10px;}
   .notificacao .hora{font-weight:700; white-space:nowrap;}
   .sem-notificacao{font-size:.82rem; color:#7a8694;}
   table{width:100%; border-collapse:collapse; font-size:.8rem; min-width:560px;}
   th{text-align:left; color:#66748a; font-weight:600; padding:8px 10px; border-bottom:2px solid #e8edf4;}
-  td{padding:9px 10px; border-bottom:1px solid #f0f3f8;}
+  td{padding:9px 10px; border-bottom:1px solid #f0f3f8; vertical-align:middle;}
   .ok{color:var(--verde); font-weight:700;}
   .falta{color:var(--vermelho); font-weight:700;}
   .oculto{display:none;}
+  .grade-2{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:20px; align-items:start;}
+  .senha-gerada{background:#e9f1fb; border:1.5px dashed var(--azul); border-radius:9px; padding:14px;
+        text-align:center; margin-top:12px;}
+  .senha-gerada .valor{font-size:1.3rem; font-weight:700; letter-spacing:2px; color:var(--azul-escuro);
+        font-family:ui-monospace,Consolas,monospace;}
+  .senha-gerada .legenda{font-size:.74rem; color:#7a8694; margin-top:4px;}
+  .tag-cargo{font-size:.7rem; background:#e9f1fb; color:var(--azul); padding:3px 9px; border-radius:12px; font-weight:600;}
+  .tag-inativo{font-size:.7rem; background:#f0f0f0; color:#9aa0a6; padding:3px 9px; border-radius:12px; font-weight:600;}
 </style>
 </head>
 <body>
@@ -122,7 +145,7 @@
     <p class="sub">E.E Anna Maria — acesso restrito</p>
     <div class="seletor-perfil">
       <button id="btnProf" class="ativo" onclick="escolherPerfil('professor')">🧑‍🏫 Professor</button>
-      <button id="btnGestao" onclick="escolherPerfil('gestao')">🏫 Gestão Escolar</button>
+      <button id="btnGestao" onclick="escolherPerfil('gestao')">🏫 Gestão / Direção</button>
     </div>
     <div class="erro" id="erroLogin"></div>
     <form onsubmit="entrar(); return false;">
@@ -144,6 +167,38 @@
       </div>
       <button class="btn" type="submit" id="btnEntrar">Entrar</button>
     </form>
+    <button class="link-simples" onclick="abrirRecuperacao()">Esqueci minha senha</button>
+  </div>
+</div>
+
+<!-- ================= RECUPERAÇÃO DE SENHA ================= -->
+<div class="sombra" id="sombraRecuperacao" onclick="if(event.target===this)fecharRecuperacao()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>Esqueci minha senha</h3>
+    <p class="sub">Não há envio automático de e-mail. Seu pedido cai numa fila e a gestão/direção
+      te entrega uma nova senha temporária pessoalmente.</p>
+    <div class="erro" id="erroRecuperacao"></div>
+    <div class="ok-msg" id="okRecuperacao"></div>
+    <div class="seletor-perfil">
+      <button id="btnRecProf" class="ativo" onclick="escolherPerfilRecuperacao('professor')">🧑‍🏫 Professor</button>
+      <button id="btnRecGestao" onclick="escolherPerfilRecuperacao('gestao')">🏫 Gestão / Direção</button>
+    </div>
+    <div id="recProfessor">
+      <div class="campo">
+        <label for="selRecProfessor">Professor(a)</label>
+        <select id="selRecProfessor"><option value="">— selecione seu nome —</option></select>
+      </div>
+    </div>
+    <div id="recGestao" class="oculto">
+      <div class="campo">
+        <label for="inpRecEmail">E-mail institucional</label>
+        <input type="text" id="inpRecEmail" placeholder="seuemail@eeannamaria.sp.gov.br">
+      </div>
+    </div>
+    <div class="linha-botoes">
+      <button class="btn secundario" onclick="fecharRecuperacao()">Cancelar</button>
+      <button class="btn" onclick="enviarRecuperacao()">Enviar pedido</button>
+    </div>
   </div>
 </div>
 
@@ -152,7 +207,7 @@
   <div class="cartao-central">
     <div class="logo">🔒</div>
     <h2>Crie sua nova senha</h2>
-    <p class="sub">Por segurança, troque a senha inicial antes de continuar.</p>
+    <p class="sub">Por segurança, troque a senha inicial/temporária antes de continuar.</p>
     <div class="erro" id="erroSenha"></div>
     <form onsubmit="salvarNovaSenha(); return false;">
       <div class="campo">
@@ -177,21 +232,154 @@
   <div class="painel">
     <h2 id="tituloPainel"></h2>
     <p class="sub" id="subPainel"></p>
-    <div class="grade-estacoes" id="gradeEstacoes"></div>
 
-    <div class="bloco-gestao oculto" id="blocoNotificacoes">
-      <h3>🔔 Alertas e observações (somente gestão)</h3>
-      <div id="listaNotificacoes"></div>
+    <div class="abas" id="abas">
+      <button class="ativo" onclick="mudarAba('estacoes')">🖥 Estações</button>
+      <button onclick="mudarAba('agendamentos')">🗓 Agendamentos</button>
+      <button class="oculto" id="abaContas" onclick="mudarAba('contas')">👤 Contas</button>
+      <button class="oculto" id="abaAdmin" onclick="mudarAba('admin')">⚙️ Estações (admin)</button>
     </div>
-    <div class="bloco-gestao oculto" id="blocoHistorico">
-      <h3>📋 Histórico de registros</h3>
-      <table>
-        <thead><tr>
-          <th>Professor(a)</th><th>Estação</th><th>Sala / Turma</th>
-          <th>Retirada</th><th>Devolução</th><th>Situação</th>
-        </tr></thead>
-        <tbody id="corpoHistorico"></tbody>
-      </table>
+
+    <!-- ---- ABA: ESTAÇÕES ---- -->
+    <div id="secEstacoes">
+      <div class="grade-estacoes" id="gradeEstacoes"></div>
+      <div class="bloco-gestao oculto" id="blocoNotificacoes">
+        <h3>🔔 Alertas e observações (somente gestão)</h3>
+        <div id="listaNotificacoes"></div>
+      </div>
+      <div class="bloco-gestao oculto" id="blocoHistorico">
+        <h3>📋 Histórico de registros</h3>
+        <table>
+          <thead><tr>
+            <th>Professor(a)</th><th>Estação</th><th>Sala / Turma</th>
+            <th>Retirada</th><th>Devolução</th><th>Situação</th>
+          </tr></thead>
+          <tbody id="corpoHistorico"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---- ABA: AGENDAMENTOS ---- -->
+    <div id="secAgendamentos" class="oculto">
+      <div class="grade-2">
+        <div class="bloco-gestao" style="margin-top:0">
+          <h3>🗓 Novo agendamento</h3>
+          <p class="explic">Reserve com antecedência a Sala de Informática (turma inteira) ou uma Estação
+            específica, evitando choque de horário com outro professor.</p>
+          <div class="erro" id="erroAgenda"></div>
+          <div class="campo">
+            <label for="selRecurso">O que deseja agendar</label>
+            <select id="selRecurso"></select>
+          </div>
+          <div class="campo">
+            <label for="inpDataAgenda">Data</label>
+            <input type="date" id="inpDataAgenda">
+          </div>
+          <div class="linha-botoes">
+            <div class="campo" style="flex:1">
+              <label for="inpHoraIni">Início</label>
+              <input type="time" id="inpHoraIni">
+            </div>
+            <div class="campo" style="flex:1">
+              <label for="inpHoraFim">Fim</label>
+              <input type="time" id="inpHoraFim">
+            </div>
+          </div>
+          <div class="campo">
+            <label for="inpTurmaAgenda">Turma / observação</label>
+            <input type="text" id="inpTurmaAgenda" placeholder="ex.: 8º B — revisão para prova">
+          </div>
+          <button class="btn" onclick="criarAgendamento()">Confirmar agendamento</button>
+        </div>
+        <div class="bloco-gestao" style="margin-top:0">
+          <h3>📅 Próximos agendamentos</h3>
+          <div id="listaAgendamentos"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- ABA: CONTAS (gestão) ---- -->
+    <div id="secContas" class="oculto">
+      <div class="grade-2">
+        <div class="bloco-gestao" style="margin-top:0">
+          <h3>➕ Criar conta administrativa</h3>
+          <p class="explic">Para estagiários, diretor(a), vice-diretor(a) e CGPAC. Todas têm as mesmas
+            permissões de gestão.</p>
+          <div class="erro" id="erroContaAdmin"></div>
+          <div class="campo">
+            <label for="inpNomeAdmin">Nome</label>
+            <input type="text" id="inpNomeAdmin">
+          </div>
+          <div class="campo">
+            <label for="inpEmailAdmin">E-mail institucional</label>
+            <input type="text" id="inpEmailAdmin">
+          </div>
+          <div class="campo">
+            <label for="selCargoAdmin">Cargo</label>
+            <select id="selCargoAdmin"></select>
+          </div>
+          <button class="btn" onclick="criarContaAdmin()">Criar conta</button>
+          <div class="senha-gerada oculto" id="senhaGeradaAdmin">
+            <div class="valor" id="valorSenhaAdmin"></div>
+            <div class="legenda">Senha temporária — anote e entregue pessoalmente. Será exigida troca no 1º acesso.</div>
+          </div>
+        </div>
+        <div class="bloco-gestao" style="margin-top:0">
+          <h3>🔑 Pedidos de redefinição de senha</h3>
+          <div id="listaPedidosSenha"></div>
+        </div>
+      </div>
+      <div class="bloco-gestao">
+        <h3>👥 Contas cadastradas</h3>
+        <table>
+          <thead><tr><th>Nome</th><th>Perfil</th><th>E-mail</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody id="corpoUsuarios"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---- ABA: ADMIN DE ESTAÇÕES (gestão) ---- -->
+    <div id="secAdmin" class="oculto">
+      <div class="grade-2">
+        <div class="bloco-gestao" style="margin-top:0">
+          <h3>📥 Importar planilha</h3>
+          <p class="explic">Cole os dados no formato <code>id,capacidade,qtd</code> (uma linha por estação;
+            cabeçalho opcional). Estações em uso são ignoradas.</p>
+          <div class="erro" id="erroImportar"></div>
+          <div class="campo">
+            <textarea id="txtImportar" placeholder="id,capacidade,qtd&#10;A,32,30&#10;B,32,32&#10;C,30,28"></textarea>
+          </div>
+          <button class="btn" onclick="importarPlanilha()">Importar</button>
+          <div id="resultadoImportar" style="margin-top:12px; font-size:.8rem; color:#44536a;"></div>
+        </div>
+        <div class="bloco-gestao" style="margin-top:0">
+          <h3>✏️ Editar estação</h3>
+          <p class="explic">Ajuste capacidade e quantidade atual diretamente (estação precisa estar disponível).</p>
+          <div class="erro" id="erroEditar"></div>
+          <div class="campo">
+            <label for="selEstacaoEditar">Estação</label>
+            <select id="selEstacaoEditar" onchange="preencherEdicaoEstacao()"></select>
+          </div>
+          <div class="linha-botoes">
+            <div class="campo" style="flex:1">
+              <label for="inpCapEditar">Capacidade</label>
+              <input type="number" id="inpCapEditar" min="1">
+            </div>
+            <div class="campo" style="flex:1">
+              <label for="inpQtdEditar">Quantidade atual</label>
+              <input type="number" id="inpQtdEditar" min="0">
+            </div>
+          </div>
+          <button class="btn" onclick="salvarEdicaoEstacao()">Salvar alterações</button>
+        </div>
+      </div>
+      <div class="bloco-gestao">
+        <h3>📊 Uso das estações por professor(a)</h3>
+        <table>
+          <thead><tr><th>Professor(a)</th><th>Total de retiradas</th><th>Estação mais usada</th></tr></thead>
+          <tbody id="corpoRelatorio"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -250,13 +438,15 @@
 let token = localStorage.getItem('token') || null;
 let usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
 let perfilLogin = 'professor';
-let estacoes = [], salas = [];
-let estacaoAtiva = null, modoModal = 'retirada', atualizador = null;
+let perfilRecuperacao = 'professor';
+let estacoes = [], salas = [], recursos = [], cargos = [];
+let estacaoAtiva = null, modoModal = 'retirada', atualizador = null, abaAtual = 'estacoes';
 
-async function api(caminho, corpo){
+async function api(caminho, corpo, metodo){
   const opts = { headers: { 'Content-Type': 'application/json' } };
   if (token) opts.headers.Authorization = 'Bearer ' + token;
-  if (corpo) { opts.method = 'POST'; opts.body = JSON.stringify(corpo); }
+  if (corpo) { opts.method = metodo || 'POST'; opts.body = JSON.stringify(corpo); }
+  else if (metodo) { opts.method = metodo; }
   const resp = await fetch('/api' + caminho, opts);
   const dados = await resp.json().catch(() => ({}));
   if (resp.status === 401 && caminho !== '/login') { sair(); throw new Error(dados.erro || 'Sessão expirada.'); }
@@ -269,6 +459,10 @@ function hora(iso){
   const hoje = new Date().toDateString() === d.toDateString();
   const hm = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
   return hoje ? hm : d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+hm;
+}
+function dataBr(iso){
+  const [a,m,d] = iso.split('-');
+  return `${d}/${m}/${a}`;
 }
 
 /* ================= GABINETE TES GUARDIAN (SVG) ================= */
@@ -325,7 +519,21 @@ function svgGabinete(e, visaoGestao){
   </svg>`;
 }
 
-/* ================= PAINEL ================= */
+/* ================= ABAS ================= */
+function mudarAba(aba){
+  abaAtual = aba;
+  ['estacoes','agendamentos','contas','admin'].forEach(a=>{
+    document.getElementById('sec'+a.charAt(0).toUpperCase()+a.slice(1)).classList.toggle('oculto', a!==aba);
+  });
+  [...document.getElementById('abas').children].forEach(b=>b.classList.remove('ativo'));
+  const idx = {estacoes:0,agendamentos:1,contas:2,admin:3}[aba];
+  document.getElementById('abas').children[idx].classList.add('ativo');
+  if(aba==='agendamentos') carregarAgendamentos().catch(err=>toast('⚠ '+err.message));
+  if(aba==='contas') carregarContas().catch(err=>toast('⚠ '+err.message));
+  if(aba==='admin') carregarAdminEstacoes().catch(err=>toast('⚠ '+err.message));
+}
+
+/* ================= PAINEL: ESTAÇÕES ================= */
 async function carregarPainel(){
   const gestao = usuario.perfil === 'gestao';
   estacoes = await api('/estacoes');
@@ -417,6 +625,178 @@ async function resolverDivergencia(){
   }catch(err){ toast('⚠ '+err.message); }
 }
 
+/* ================= AGENDAMENTOS ================= */
+async function carregarAgendamentos(){
+  if(!recursos.length) recursos = await api('/recursos');
+  const sel = document.getElementById('selRecurso');
+  if(!sel.options.length) sel.innerHTML = recursos.map(r=>`<option value="${r.id}">${r.nome}</option>`).join('');
+
+  const lista = await api('/agendamentos');
+  const hoje = new Date().toISOString().slice(0,10);
+  const futuros = lista.filter(a=>a.data>=hoje);
+  const nomeRecurso = id => (recursos.find(r=>r.id===id)||{}).nome || id;
+
+  document.getElementById('listaAgendamentos').innerHTML = futuros.length ? futuros.map(a=>`
+    <div class="notificacao" style="background:#e9f1fb; color:#143d73;">
+      <span style="flex:1">
+        <b>${nomeRecurso(a.recurso)}</b><br>
+        📅 ${dataBr(a.data)} · ${a.horaInicio}–${a.horaFim}<br>
+        🧑‍🏫 Prof. ${a.professorNome}${a.turma?' · '+a.turma:''}
+      </span>
+      ${(a.minha || usuario.perfil==='gestao') ? `<button class="btn perigo pequeno" onclick="cancelarAgendamento(${a.id})">Cancelar</button>` : ''}
+    </div>
+  `).join('') : '<div class="sem-notificacao">Nenhum agendamento futuro.</div>';
+}
+
+async function criarAgendamento(){
+  const erro = document.getElementById('erroAgenda');
+  erro.classList.remove('visivel');
+  try{
+    await api('/agendamentos', {
+      recurso: document.getElementById('selRecurso').value,
+      data: document.getElementById('inpDataAgenda').value,
+      horaInicio: document.getElementById('inpHoraIni').value,
+      horaFim: document.getElementById('inpHoraFim').value,
+      turma: document.getElementById('inpTurmaAgenda').value.trim() || undefined,
+    });
+    toast('✅ Agendamento confirmado.');
+    document.getElementById('inpDataAgenda').value='';
+    document.getElementById('inpHoraIni').value='';
+    document.getElementById('inpHoraFim').value='';
+    document.getElementById('inpTurmaAgenda').value='';
+    await carregarAgendamentos();
+  }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
+}
+
+async function cancelarAgendamento(id){
+  try{
+    await api(`/agendamentos/${id}/cancelar`, {}, 'POST');
+    toast('Agendamento cancelado.');
+    await carregarAgendamentos();
+  }catch(err){ toast('⚠ '+err.message); }
+}
+
+/* ================= CONTAS (gestão) ================= */
+async function carregarContas(){
+  if(!cargos.length){
+    cargos = await api('/cargos');
+    document.getElementById('selCargoAdmin').innerHTML = cargos.map(c=>`<option>${c}</option>`).join('');
+  }
+  const [usuarios, pedidos] = await Promise.all([api('/usuarios'), api('/redefinicoes-pendentes')]);
+
+  document.getElementById('listaPedidosSenha').innerHTML = pedidos.length ? pedidos.map(p=>`
+    <div class="notificacao" style="background:#fdf3d7; color:#7a5c00;">
+      <span style="flex:1"><b>${p.nome}</b><br>${p.perfil==='gestao'?(p.cargo||'Gestão'):'Professor(a)'} · pedido em ${hora(p.criado_em)}</span>
+      <button class="btn pequeno" onclick="atenderPedido(${p.id})">Gerar senha</button>
+    </div>
+  `).join('') : '<div class="sem-notificacao">Nenhum pedido pendente. ✅</div>';
+
+  document.getElementById('corpoUsuarios').innerHTML = usuarios.map(u=>`
+    <tr>
+      <td>${u.nome}</td>
+      <td>${u.perfil==='gestao' ? `<span class="tag-cargo">${u.cargo||'Gestão'}</span>` : 'Professor(a)'}</td>
+      <td>${u.email||'—'}</td>
+      <td>${u.ativo ? '✅ Ativo' : '<span class="tag-inativo">Inativo</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn secundario pequeno" onclick="resetarSenhaUsuario(${u.id},'${u.nome.replace(/'/g,"\\'")}')">Resetar senha</button>
+        <button class="btn secundario pequeno" onclick="alternarAtivo(${u.id})">${u.ativo?'Desativar':'Ativar'}</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function criarContaAdmin(){
+  const erro = document.getElementById('erroContaAdmin');
+  erro.classList.remove('visivel');
+  document.getElementById('senhaGeradaAdmin').classList.add('oculto');
+  try{
+    const r = await api('/usuarios/admin', {
+      nome: document.getElementById('inpNomeAdmin').value.trim(),
+      email: document.getElementById('inpEmailAdmin').value.trim(),
+      cargo: document.getElementById('selCargoAdmin').value,
+    });
+    document.getElementById('valorSenhaAdmin').textContent = r.senhaTemp;
+    document.getElementById('senhaGeradaAdmin').classList.remove('oculto');
+    document.getElementById('inpNomeAdmin').value='';
+    document.getElementById('inpEmailAdmin').value='';
+    await carregarContas();
+  }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
+}
+
+async function atenderPedido(id){
+  try{
+    const r = await api(`/redefinicoes/${id}/atender`, {}, 'POST');
+    alert(`Senha temporária de ${r.nome}: ${r.senhaTemp}\n\nAnote e entregue pessoalmente — ela será obrigada a trocar no próximo acesso.`);
+    await carregarContas();
+  }catch(err){ toast('⚠ '+err.message); }
+}
+
+async function resetarSenhaUsuario(id, nome){
+  if(!confirm(`Gerar uma nova senha temporária para ${nome}?`)) return;
+  try{
+    const r = await api(`/usuarios/${id}/resetar-senha`, {}, 'POST');
+    alert(`Senha temporária de ${r.nome}: ${r.senhaTemp}\n\nAnote e entregue pessoalmente.`);
+  }catch(err){ toast('⚠ '+err.message); }
+}
+
+async function alternarAtivo(id){
+  try{
+    await api(`/usuarios/${id}/alternar-ativo`, {}, 'POST');
+    await carregarContas();
+  }catch(err){ toast('⚠ '+err.message); }
+}
+
+/* ================= ADMIN DE ESTAÇÕES (gestão) ================= */
+async function carregarAdminEstacoes(){
+  const [ests, relatorio] = await Promise.all([api('/estacoes'), api('/relatorios/uso-professores')]);
+  const sel = document.getElementById('selEstacaoEditar');
+  if(!sel.options.length){
+    sel.innerHTML = ests.map(e=>`<option value="${e.id}">Estação ${e.id}</option>`).join('');
+    preencherEdicaoEstacao(ests);
+  }
+  document.getElementById('corpoRelatorio').innerHTML = relatorio.length ? relatorio.map(p=>`
+    <tr><td>${p.nome}</td><td>${p.total}</td><td>${p.estacaoMaisUsada?'Estação '+p.estacaoMaisUsada:'—'}</td></tr>
+  `).join('') : '<tr><td colspan="3">Ainda não há registros suficientes.</td></tr>';
+}
+
+function preencherEdicaoEstacao(listaEstacoes){
+  const lista = listaEstacoes || estacoes;
+  const id = document.getElementById('selEstacaoEditar').value;
+  const e = lista.find(x=>x.id===id);
+  if(!e) return;
+  document.getElementById('inpCapEditar').value = e.capacidade;
+  document.getElementById('inpQtdEditar').value = e.qtd ?? '';
+}
+
+async function salvarEdicaoEstacao(){
+  const erro = document.getElementById('erroEditar');
+  erro.classList.remove('visivel');
+  try{
+    const id = document.getElementById('selEstacaoEditar').value;
+    await api(`/estacoes/${id}`, {
+      capacidade: Number(document.getElementById('inpCapEditar').value),
+      qtd: Number(document.getElementById('inpQtdEditar').value),
+    }, 'PUT');
+    toast('✅ Estação atualizada.');
+    await carregarAdminEstacoes();
+    await carregarPainel();
+  }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
+}
+
+async function importarPlanilha(){
+  const erro = document.getElementById('erroImportar');
+  erro.classList.remove('visivel');
+  try{
+    const r = await api('/estacoes/importar', { csv: document.getElementById('txtImportar').value });
+    document.getElementById('resultadoImportar').innerHTML =
+      `✅ Atualizadas: ${r.atualizadas.join(', ') || 'nenhuma'}`
+      + (r.ignoradas.length ? `<br>⚠ Ignoradas:<br>${r.ignoradas.join('<br>')}` : '');
+    toast('Importação concluída.');
+    await carregarAdminEstacoes();
+    await carregarPainel();
+  }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
+}
+
 /* ================= LOGIN / SESSÃO ================= */
 function escolherPerfil(p){
   perfilLogin = p;
@@ -471,12 +851,46 @@ async function salvarNovaSenha(){
   }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
 }
 
+/* ---- Recuperação de senha (deslogado) ---- */
+function abrirRecuperacao(){
+  document.getElementById('erroRecuperacao').classList.remove('visivel');
+  document.getElementById('okRecuperacao').classList.remove('visivel');
+  document.getElementById('sombraRecuperacao').classList.add('visivel');
+}
+function fecharRecuperacao(){ document.getElementById('sombraRecuperacao').classList.remove('visivel'); }
+function escolherPerfilRecuperacao(p){
+  perfilRecuperacao = p;
+  document.getElementById('btnRecProf').classList.toggle('ativo', p==='professor');
+  document.getElementById('btnRecGestao').classList.toggle('ativo', p==='gestao');
+  document.getElementById('recProfessor').classList.toggle('oculto', p!=='professor');
+  document.getElementById('recGestao').classList.toggle('oculto', p!=='gestao');
+}
+async function enviarRecuperacao(){
+  const erro = document.getElementById('erroRecuperacao');
+  const ok = document.getElementById('okRecuperacao');
+  erro.classList.remove('visivel'); ok.classList.remove('visivel');
+  const corpo = { perfil: perfilRecuperacao };
+  if(perfilRecuperacao==='professor'){
+    const id = Number(document.getElementById('selRecProfessor').value);
+    if(!id){ erro.textContent='Selecione seu nome.'; erro.classList.add('visivel'); return; }
+    corpo.professorId = id;
+  } else {
+    const email = document.getElementById('inpRecEmail').value.trim();
+    if(!email){ erro.textContent='Informe o e-mail institucional.'; erro.classList.add('visivel'); return; }
+    corpo.email = email;
+  }
+  try{
+    const r = await api('/recuperar-senha', corpo);
+    ok.textContent = r.mensagem; ok.classList.add('visivel');
+  }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
+}
+
 async function abrirPainel(){
   document.getElementById('telaLogin').classList.add('oculto');
   document.getElementById('telaPainel').classList.remove('oculto');
   const gestao = usuario.perfil==='gestao';
   document.getElementById('rotuloPerfil').textContent = gestao
-    ? '🏫 Gestão Escolar · sair' : `🧑‍🏫 Prof. ${usuario.nome} · sair`;
+    ? `🏫 ${usuario.cargo||'Gestão Escolar'} · sair` : `🧑‍🏫 Prof. ${usuario.nome} · sair`;
   document.getElementById('tituloPainel').textContent = gestao
     ? 'Painel das estações' : `Olá, Prof. ${usuario.nome}! (${usuario.materia})`;
   document.getElementById('subPainel').textContent = gestao
@@ -484,15 +898,21 @@ async function abrirPainel(){
     : 'Use o botão de cada estação para registrar a retirada ou a devolução dos notebooks.';
   document.getElementById('blocoNotificacoes').classList.toggle('oculto', !gestao);
   document.getElementById('blocoHistorico').classList.toggle('oculto', !gestao);
+  document.getElementById('abaContas').classList.toggle('oculto', !gestao);
+  document.getElementById('abaAdmin').classList.toggle('oculto', !gestao);
   try{
     if(!salas.length) salas = await api('/salas');
     const sel = document.getElementById('selSala');
     sel.innerHTML = '<option value="">— selecione a sala —</option>'
       + salas.map(s=>`<option value="${s.id}">${s.id} — ${s.turmas}</option>`).join('');
+    mudarAba('estacoes');
     await carregarPainel();
   }catch(err){ toast('⚠ '+err.message); }
   clearInterval(atualizador);
-  atualizador = setInterval(()=>{ carregarPainel().catch(()=>{}); }, 15000);
+  atualizador = setInterval(()=>{
+    if(abaAtual==='estacoes') carregarPainel().catch(()=>{});
+    if(abaAtual==='agendamentos') carregarAgendamentos().catch(()=>{});
+  }, 15000);
 }
 
 function sair(){
@@ -561,15 +981,17 @@ function toast(msg){
 /* ================= INICIALIZAÇÃO ================= */
 (async function iniciar(){
   document.addEventListener('keydown', ev=>{
-    if(ev.key==='Escape'){ fecharModal(); fecharDetalhes(); }
+    if(ev.key==='Escape'){ fecharModal(); fecharDetalhes(); fecharRecuperacao(); }
   });
   try{
     const profs = await api('/professores');
-    const sel = document.getElementById('selProfessor');
-    profs.forEach(p=>{
-      const o = document.createElement('option');
-      o.value = p.id; o.textContent = `${p.nome} — ${p.materia}`;
-      sel.appendChild(o);
+    ['selProfessor','selRecProfessor'].forEach(idSel=>{
+      const sel = document.getElementById(idSel);
+      profs.forEach(p=>{
+        const o = document.createElement('option');
+        o.value = p.id; o.textContent = `${p.nome} — ${p.materia}`;
+        sel.appendChild(o);
+      });
     });
   }catch{ /* servidor fora do ar: a tela de login ainda aparece */ }
   // Sessão salva: volta direto ao painel
