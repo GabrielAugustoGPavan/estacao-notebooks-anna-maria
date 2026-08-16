@@ -27,6 +27,36 @@ const RECURSOS = [
   { id: 'estacao_C', nome: 'Estação C (carrinho móvel)' },
 ];
 
+// Dias letivos — a grade de agendamento é semanal fixa (repete toda semana,
+// no mesmo espírito da grade de horários oficial da escola).
+const DIAS_SEMANA = [
+  { id: 'segunda', nome: 'Segunda-feira' },
+  { id: 'terca', nome: 'Terça-feira' },
+  { id: 'quarta', nome: 'Quarta-feira' },
+  { id: 'quinta', nome: 'Quinta-feira' },
+  { id: 'sexta', nome: 'Sexta-feira' },
+];
+
+// Períodos (aulas) — extraídos dos horários oficiais 2026 da escola.
+// "Manhã" = Anos Finais (6º ao 9º); "Tarde/Noite" = Ensino Médio.
+// Intervalo e almoço/jantar não entram aqui (não são horários agendáveis).
+const PERIODOS = [
+  { id: 'm1', turno: 'Manhã',       rotulo: '1ª aula', inicio: '07:00', fim: '07:50' },
+  { id: 'm2', turno: 'Manhã',       rotulo: '2ª aula', inicio: '07:50', fim: '08:40' },
+  { id: 'm3', turno: 'Manhã',       rotulo: '3ª aula', inicio: '09:00', fim: '09:50' },
+  { id: 'm4', turno: 'Manhã',       rotulo: '4ª aula', inicio: '09:50', fim: '10:40' },
+  { id: 'm5', turno: 'Manhã',       rotulo: '5ª aula', inicio: '11:30', fim: '12:20' },
+  { id: 'm6', turno: 'Manhã',       rotulo: '6ª aula', inicio: '12:20', fim: '13:10' },
+  { id: 'm7', turno: 'Manhã',       rotulo: '7ª aula', inicio: '13:10', fim: '14:00' },
+  { id: 't1', turno: 'Tarde/Noite', rotulo: '1ª aula', inicio: '14:20', fim: '15:10' },
+  { id: 't2', turno: 'Tarde/Noite', rotulo: '2ª aula', inicio: '15:10', fim: '16:00' },
+  { id: 't3', turno: 'Tarde/Noite', rotulo: '3ª aula', inicio: '16:20', fim: '17:10' },
+  { id: 't4', turno: 'Tarde/Noite', rotulo: '4ª aula', inicio: '17:10', fim: '18:00' },
+  { id: 't5', turno: 'Tarde/Noite', rotulo: '5ª aula', inicio: '18:00', fim: '18:50' },
+  { id: 't6', turno: 'Tarde/Noite', rotulo: '6ª aula', inicio: '19:40', fim: '20:30' },
+  { id: 't7', turno: 'Tarde/Noite', rotulo: '7ª aula', inicio: '20:30', fim: '21:20' },
+];
+
 // Cargos administrativos que a gestão pode cadastrar (além da própria Gestão)
 const CARGOS_ADMIN = ['Gestão Escolar', 'Diretor(a)', 'Vice-Diretor(a)', 'CGPAC', 'Estagiário(a)'];
 
@@ -121,16 +151,15 @@ const TABELAS = [
     texto         TEXT NOT NULL,
     criada_em     TEXT NOT NULL
   )`,
-  // Agendamento antecipado — cobre tanto "Sala de Informática" (turma toda)
-  // quanto reserva futura de uma Estação (A/B/C) para depois retirada imediata.
+  // Agendamento fixo semanal (grade, no mesmo espírito da grade de horários da
+  // escola): cobre tanto "Sala de Informática" (turma toda) quanto reserva
+  // futura de uma Estação (A/B/C). Repete toda semana até ser cancelado.
   `CREATE TABLE IF NOT EXISTS agendamentos (
     id            ${ID_AUTO},
     usuario_id    INTEGER NOT NULL REFERENCES usuarios(id),
     recurso       TEXT NOT NULL,
-    data          TEXT NOT NULL,
-    hora_inicio   TEXT NOT NULL,
-    hora_fim      TEXT NOT NULL,
-    sala          TEXT,
+    dia_semana    TEXT NOT NULL,
+    periodo_id    TEXT NOT NULL,
     turma         TEXT,
     observacao    TEXT,
     status        TEXT NOT NULL DEFAULT 'confirmado' CHECK (status IN ('confirmado','cancelado')),
@@ -154,6 +183,29 @@ async function migrar() {
     else await run('ALTER TABLE usuarios ADD COLUMN cargo TEXT');
   } catch (e) {
     if (!/duplicate column|already exists/i.test(e.message)) throw e;
+  }
+
+  // A tabela agendamentos mudou de "data específica" para "grade semanal fixa"
+  // (dia_semana + periodo_id). Se o banco ainda tem o formato antigo, recria a
+  // tabela — são reservas futuras de teste, sem valor histórico a preservar.
+  const colunas = usaPostgres
+    ? await all("SELECT column_name FROM information_schema.columns WHERE table_name='agendamentos'")
+    : await all("PRAGMA table_info(agendamentos)");
+  const nomes = colunas.map(c => c.column_name || c.name);
+  if (nomes.includes('data')) {
+    await run('DROP TABLE agendamentos');
+    await run(`CREATE TABLE agendamentos (
+      id            ${ID_AUTO},
+      usuario_id    INTEGER NOT NULL REFERENCES usuarios(id),
+      recurso       TEXT NOT NULL,
+      dia_semana    TEXT NOT NULL,
+      periodo_id    TEXT NOT NULL,
+      turma         TEXT,
+      observacao    TEXT,
+      status        TEXT NOT NULL DEFAULT 'confirmado' CHECK (status IN ('confirmado','cancelado')),
+      criado_em     TEXT NOT NULL
+    )`);
+    console.log('[banco] Tabela agendamentos migrada para o formato de grade semanal fixa.');
   }
 }
 
@@ -196,6 +248,6 @@ async function inicializar() {
 
 module.exports = {
   inicializar, all, get, run,
-  SALAS, RECURSOS, CARGOS_ADMIN, LOCAL_PADRAO,
+  SALAS, RECURSOS, CARGOS_ADMIN, LOCAL_PADRAO, DIAS_SEMANA, PERIODOS,
   gerarSenhaTemporaria,
 };
