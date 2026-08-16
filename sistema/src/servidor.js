@@ -15,7 +15,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const {
   inicializar, all, get, run,
-  SALAS, RECURSOS, CARGOS_ADMIN, LOCAL_PADRAO,
+  SALAS, RECURSOS, CARGOS_ADMIN, LOCAL_PADRAO, DIAS_SEMANA, PERIODOS,
   gerarSenhaTemporaria,
 } = require('./banco');
 
@@ -66,6 +66,8 @@ app.get('/api/professores', rota(async (_req, res) => {
 app.get('/api/salas', (_req, res) => res.json(SALAS));
 app.get('/api/recursos', (_req, res) => res.json(RECURSOS));
 app.get('/api/cargos', (_req, res) => res.json(CARGOS_ADMIN));
+app.get('/api/dias-semana', (_req, res) => res.json(DIAS_SEMANA));
+app.get('/api/periodos', (_req, res) => res.json(PERIODOS));
 
 app.post('/api/login', rota(async (req, res) => {
   const { perfil, professorId, email, senha } = req.body || {};
@@ -393,53 +395,49 @@ app.post('/api/estacoes/:id/resolver-divergencia', exigirLogin, exigirGestao, ro
   res.json({ ok: true });
 }));
 
-// ---------- Agendamentos (Sala de Informática e reserva antecipada de Estação) ----------
+// ---------- Agendamentos: grade semanal fixa (Sala de Informática e Estações) ----------
+// Reserva um horário da grade (dia da semana + aula) que repete toda semana,
+// no mesmo espírito da grade de horários oficial da escola — até ser cancelado.
 app.get('/api/agendamentos', exigirLogin, rota(async (req, res) => {
-  const { de, ate } = req.query;
+  const { recurso } = req.query;
   const condicoes = ["a.status='confirmado'"];
   const params = [];
-  if (de) { condicoes.push('a.data >= ?'); params.push(de); }
-  if (ate) { condicoes.push('a.data <= ?'); params.push(ate); }
+  if (recurso) { condicoes.push('a.recurso=?'); params.push(recurso); }
   const linhas = await all(`
     SELECT a.*, u.nome AS professor_nome
     FROM agendamentos a JOIN usuarios u ON u.id = a.usuario_id
     WHERE ${condicoes.join(' AND ')}
-    ORDER BY a.data, a.hora_inicio
   `, params);
   res.json(linhas.map(a => ({
-    id: a.id, recurso: a.recurso, data: a.data,
-    horaInicio: a.hora_inicio, horaFim: a.hora_fim,
-    sala: a.sala, turma: a.turma, observacao: a.observacao,
+    id: a.id, recurso: a.recurso, diaSemana: a.dia_semana, periodoId: a.periodo_id,
+    turma: a.turma, observacao: a.observacao,
     professorNome: a.professor_nome, minha: a.usuario_id === req.usuario.id,
   })));
 }));
 
 app.post('/api/agendamentos', exigirLogin, rota(async (req, res) => {
-  const { recurso, data, horaInicio, horaFim, sala, turma, observacao } = req.body || {};
+  const { recurso, diaSemana, periodoId, turma, observacao } = req.body || {};
   if (!RECURSOS.some(r => r.id === recurso)) return res.status(400).json({ erro: 'Selecione o que deseja agendar.' });
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) return res.status(400).json({ erro: 'Informe uma data válida.' });
-  if (!/^\d{2}:\d{2}$/.test(horaInicio || '') || !/^\d{2}:\d{2}$/.test(horaFim || '') || horaInicio >= horaFim) {
-    return res.status(400).json({ erro: 'Informe um horário de início e fim válidos (fim depois do início).' });
-  }
-  if (recurso === 'sala_informatica' && !SALAS.some(s => s.id === sala) && !turma) {
+  if (!DIAS_SEMANA.some(d => d.id === diaSemana)) return res.status(400).json({ erro: 'Selecione o dia da semana.' });
+  if (!PERIODOS.some(p => p.id === periodoId)) return res.status(400).json({ erro: 'Selecione a aula/horário.' });
+  if (recurso === 'sala_informatica' && !turma) {
     return res.status(400).json({ erro: 'Informe a turma que usará a Sala de Informática.' });
   }
 
   const conflito = await get(`
     SELECT a.id, u.nome FROM agendamentos a JOIN usuarios u ON u.id = a.usuario_id
-    WHERE a.recurso=? AND a.data=? AND a.status='confirmado'
-      AND a.hora_inicio < ? AND a.hora_fim > ?
-  `, [recurso, data, horaFim, horaInicio]);
+    WHERE a.recurso=? AND a.dia_semana=? AND a.periodo_id=? AND a.status='confirmado'
+  `, [recurso, diaSemana, periodoId]);
   if (conflito) {
-    return res.status(409).json({ erro: `Horário já reservado por Prof. ${conflito.nome} nesse período. Escolha outro horário.` });
+    return res.status(409).json({ erro: `Esse horário já está reservado por Prof. ${conflito.nome} toda semana. Escolha outro horário.` });
   }
 
   await run(
-    `INSERT INTO agendamentos (usuario_id, recurso, data, hora_inicio, hora_fim, sala, turma, observacao, status, criado_em)
-     VALUES (?,?,?,?,?,?,?,?, 'confirmado', ?)`,
-    [req.usuario.id, recurso, data, horaInicio, horaFim, sala || null, turma || null, observacao || null, agora()]
+    `INSERT INTO agendamentos (usuario_id, recurso, dia_semana, periodo_id, turma, observacao, status, criado_em)
+     VALUES (?,?,?,?,?,?, 'confirmado', ?)`,
+    [req.usuario.id, recurso, diaSemana, periodoId, turma || null, observacao || null, agora()]
   );
-  res.json({ ok: true, mensagem: 'Agendamento confirmado.' });
+  res.json({ ok: true, mensagem: 'Horário reservado — vale para todas as semanas, até você cancelar.' });
 }));
 
 app.post('/api/agendamentos/:id/cancelar', exigirLogin, rota(async (req, res) => {
