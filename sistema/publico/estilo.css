@@ -110,6 +110,9 @@
              box-shadow:0 4px 18px rgba(20,61,115,.08); overflow-x:auto;}
   .bloco-gestao h3{font-size:.95rem; color:var(--azul-escuro); margin-bottom:12px;}
   .bloco-gestao p.explic{font-size:.78rem; color:#8a95a3; margin:-6px 0 14px;}
+  .cabecalho-bloco{display:flex; align-items:center; justify-content:space-between;
+        gap:12px; margin-bottom:12px;}
+  .cabecalho-bloco h3{margin-bottom:0;}
   .notificacao{background:#fbe3e3; color:#8c2f2f; font-size:.82rem; padding:10px 14px;
                border-radius:9px; margin-bottom:8px; display:flex; gap:10px;}
   .notificacao .hora{font-weight:700; white-space:nowrap;}

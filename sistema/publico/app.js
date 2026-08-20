@@ -193,6 +193,24 @@ async function resolverDivergencia(){
   }catch(err){ toast('⚠ '+err.message); }
 }
 
+async function limparNotificacoes(){
+  if(!confirm('Apagar todos os alertas e observações? Essa ação não pode ser desfeita.')) return;
+  try{
+    await api('/notificacoes', {}, 'DELETE');
+    toast('Alertas apagados.');
+    await carregarGestao();
+  }catch(err){ toast('⚠ '+err.message); }
+}
+
+async function limparHistorico(){
+  if(!confirm('Apagar todo o histórico de retiradas/devoluções? Essa ação não pode ser desfeita e não afeta o estado atual das estações.')) return;
+  try{
+    await api('/registros', {}, 'DELETE');
+    toast('Histórico apagado.');
+    await carregarGestao();
+  }catch(err){ toast('⚠ '+err.message); }
+}
+
 /* ================= AGENDAMENTOS: grade semanal fixa ================= */
 function nomeRecurso(id){ return (recursos.find(r=>r.id===id)||{}).nome || id; }
 
@@ -383,6 +401,23 @@ async function criarContaAdmin(){
   }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
 }
 
+async function criarContaProfessor(){
+  const erro = document.getElementById('erroContaProfessor');
+  erro.classList.remove('visivel');
+  document.getElementById('senhaGeradaProfessor').classList.add('oculto');
+  try{
+    const r = await api('/usuarios/professor', {
+      nome: document.getElementById('inpNomeProfessor').value.trim(),
+      materia: document.getElementById('inpMateriaProfessor').value.trim(),
+    });
+    document.getElementById('valorSenhaProfessor').textContent = r.senhaTemp;
+    document.getElementById('senhaGeradaProfessor').classList.remove('oculto');
+    document.getElementById('inpNomeProfessor').value='';
+    document.getElementById('inpMateriaProfessor').value='';
+    await carregarContas();
+  }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
+}
+
 async function atenderPedido(id){
   try{
     const r = await api(`/redefinicoes/${id}/atender`, {}, 'POST');
@@ -407,6 +442,24 @@ async function alternarAtivo(id){
 }
 
 /* ================= ADMIN DE ESTAÇÕES (gestão) ================= */
+async function criarEstacao(){
+  const erro = document.getElementById('erroNovaEstacao');
+  erro.classList.remove('visivel');
+  try{
+    const id = document.getElementById('inpIdNovaEstacao').value.trim().toUpperCase();
+    const capacidade = Number(document.getElementById('inpCapNovaEstacao').value);
+    await api('/estacoes', { id, capacidade });
+    toast(`✅ Estação ${id} criada.`);
+    document.getElementById('inpIdNovaEstacao').value='';
+    document.getElementById('inpCapNovaEstacao').value='';
+    // a lista de recursos agendáveis mudou (nova estação = novo recurso) — recarrega
+    recursos = await api('/recursos');
+    document.getElementById('selEstacaoEditar').innerHTML = '';
+    await carregarAdminEstacoes();
+    await carregarPainel();
+  }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
+}
+
 async function carregarAdminEstacoes(){
   const [ests, relatorio] = await Promise.all([api('/estacoes'), api('/relatorios/uso-professores')]);
   const sel = document.getElementById('selEstacaoEditar');

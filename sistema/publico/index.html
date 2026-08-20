@@ -121,7 +121,7 @@
         <div class="cartao-opcao" onclick="abrirEstacoesProfessor()">
           <div class="icone-opcao">🖥</div>
           <h3>Estações de Notebooks e Tablet</h3>
-          <p>Retire ou devolva um carrinho agora, ou reserve um horário fixo com antecedência.</p>
+          <p>Retire ou devolva uma estação móvel agora, ou reserve um horário fixo com antecedência.</p>
         </div>
       </div>
     </div>
@@ -131,11 +131,17 @@
       <button class="btn secundario pequeno oculto" id="btnVoltarEstacoes" onclick="voltarHomeProfessor()" style="margin-bottom:16px">← Voltar</button>
       <div class="grade-estacoes" id="gradeEstacoes"></div>
       <div class="bloco-gestao oculto" id="blocoNotificacoes">
-        <h3>🔔 Alertas e observações (somente gestão)</h3>
+        <div class="cabecalho-bloco">
+          <h3>🔔 Alertas e observações (somente gestão)</h3>
+          <button class="btn perigo pequeno" onclick="limparNotificacoes()">🗑 Limpar alertas</button>
+        </div>
         <div id="listaNotificacoes"></div>
       </div>
       <div class="bloco-gestao oculto" id="blocoHistorico">
-        <h3>📋 Histórico de registros</h3>
+        <div class="cabecalho-bloco">
+          <h3>📋 Histórico de registros</h3>
+          <button class="btn perigo pequeno" onclick="limparHistorico()">🗑 Limpar histórico</button>
+        </div>
         <table>
           <thead><tr>
             <th>Professor(a)</th><th>Estação</th><th>Sala / Turma</th>
@@ -190,6 +196,25 @@
           </div>
         </div>
         <div class="bloco-gestao" style="margin-top:0">
+          <h3>🧑‍🏫 Cadastrar professor(a)</h3>
+          <p class="explic">Para novos professores que ainda não estão na lista inicial. O login é feito
+            escolhendo o nome na tela, sem precisar de e-mail.</p>
+          <div class="erro" id="erroContaProfessor"></div>
+          <div class="campo">
+            <label for="inpNomeProfessor">Nome</label>
+            <input type="text" id="inpNomeProfessor">
+          </div>
+          <div class="campo">
+            <label for="inpMateriaProfessor">Matéria(s) — opcional</label>
+            <input type="text" id="inpMateriaProfessor" placeholder="ex.: Matemática / Ed. Financeira">
+          </div>
+          <button class="btn" onclick="criarContaProfessor()">Cadastrar professor(a)</button>
+          <div class="senha-gerada oculto" id="senhaGeradaProfessor">
+            <div class="valor" id="valorSenhaProfessor"></div>
+            <div class="legenda">Senha temporária — anote e entregue pessoalmente. Será exigida troca no 1º acesso.</div>
+          </div>
+        </div>
+        <div class="bloco-gestao" style="margin-top:0">
           <h3>🔑 Pedidos de redefinição de senha</h3>
           <div id="listaPedidosSenha"></div>
         </div>
@@ -206,6 +231,23 @@
     <!-- ---- ABA: ADMIN DE ESTAÇÕES (gestão) ---- -->
     <div id="secAdmin" class="oculto">
       <div class="grade-2">
+        <div class="bloco-gestao" style="margin-top:0">
+          <h3>🆕 Criar nova estação</h3>
+          <p class="explic">Cadastra uma nova estação móvel (ex.: Estação D). Ela passa a aparecer no painel
+            e vira uma opção agendável imediatamente.</p>
+          <div class="erro" id="erroNovaEstacao"></div>
+          <div class="linha-botoes">
+            <div class="campo" style="flex:1">
+              <label for="inpIdNovaEstacao">Identificador</label>
+              <input type="text" id="inpIdNovaEstacao" maxlength="10" placeholder="ex.: D" style="text-transform:uppercase">
+            </div>
+            <div class="campo" style="flex:1">
+              <label for="inpCapNovaEstacao">Capacidade</label>
+              <input type="number" id="inpCapNovaEstacao" min="1" placeholder="ex.: 20">
+            </div>
+          </div>
+          <button class="btn" onclick="criarEstacao()">Criar estação</button>
+        </div>
         <div class="bloco-gestao" style="margin-top:0">
           <h3>📥 Importar planilha</h3>
           <p class="explic">Cole os dados no formato <code>id,capacidade,qtd</code> (uma linha por estação;
