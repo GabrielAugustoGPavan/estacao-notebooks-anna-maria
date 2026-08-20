@@ -19,13 +19,10 @@ const SALAS = [
   { id: 'Sala 9', turmas: '9º A' },
 ];
 
-// Recursos que podem ser agendados com antecedência
-const RECURSOS = [
-  { id: 'sala_informatica', nome: 'Sala de Informática (turma toda)' },
-  { id: 'estacao_A', nome: 'Estação A (carrinho móvel)' },
-  { id: 'estacao_B', nome: 'Estação B (carrinho móvel)' },
-  { id: 'estacao_C', nome: 'Estação C (carrinho móvel)' },
-];
+// Obs.: a lista de "recursos agendáveis" (Sala de Informática + cada Estação)
+// não é mais fixa aqui — é montada dinamicamente a partir das estações que
+// existem de fato no banco (função montarRecursos, mais abaixo), já que agora
+// a gestão pode criar novas estações a qualquer momento.
 
 // Dias letivos — a grade de agendamento é semanal fixa (repete toda semana,
 // no mesmo espírito da grade de horários oficial da escola).
@@ -217,6 +214,16 @@ function gerarSenhaTemporaria() {
   return s;
 }
 
+// Monta a lista de recursos agendáveis: Sala de Informática + uma entrada por
+// estação móvel que existir de fato no banco no momento (em ordem alfabética).
+async function montarRecursos() {
+  const estacoes = await all('SELECT id FROM estacoes ORDER BY id');
+  return [
+    { id: 'sala_informatica', nome: 'Sala de Informática (turma toda)' },
+    ...estacoes.map(e => ({ id: 'estacao_' + e.id, nome: `Estação ${e.id} (estação móvel)` })),
+  ];
+}
+
 async function inicializar() {
   for (const sql of TABELAS) await run(sql);
   await migrar();
@@ -248,6 +255,6 @@ async function inicializar() {
 
 module.exports = {
   inicializar, all, get, run,
-  SALAS, RECURSOS, CARGOS_ADMIN, LOCAL_PADRAO, DIAS_SEMANA, PERIODOS,
-  gerarSenhaTemporaria,
+  SALAS, CARGOS_ADMIN, LOCAL_PADRAO, DIAS_SEMANA, PERIODOS,
+  gerarSenhaTemporaria, montarRecursos,
 };

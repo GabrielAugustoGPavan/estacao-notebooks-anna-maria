@@ -15,8 +15,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const {
   inicializar, all, get, run,
-  SALAS, RECURSOS, CARGOS_ADMIN, LOCAL_PADRAO, DIAS_SEMANA, PERIODOS,
-  gerarSenhaTemporaria,
+  SALAS, CARGOS_ADMIN, LOCAL_PADRAO, DIAS_SEMANA, PERIODOS,
+  gerarSenhaTemporaria, montarRecursos,
 } = require('./banco');
 
 const app = express();
@@ -64,7 +64,7 @@ app.get('/api/professores', rota(async (_req, res) => {
 }));
 
 app.get('/api/salas', (_req, res) => res.json(SALAS));
-app.get('/api/recursos', (_req, res) => res.json(RECURSOS));
+app.get('/api/recursos', rota(async (_req, res) => res.json(await montarRecursos())));
 app.get('/api/cargos', (_req, res) => res.json(CARGOS_ADMIN));
 app.get('/api/dias-semana', (_req, res) => res.json(DIAS_SEMANA));
 app.get('/api/periodos', (_req, res) => res.json(PERIODOS));
@@ -181,6 +181,24 @@ app.post('/api/usuarios/admin', exigirLogin, exigirGestao, rota(async (req, res)
   res.json({ ok: true, senhaTemp });
 }));
 
+// Criar conta de professor(a) — a lista inicial já vem pronta com os horários
+// 2026, mas a gestão pode cadastrar novos professores a qualquer momento.
+app.post('/api/usuarios/professor', exigirLogin, exigirGestao, rota(async (req, res) => {
+  const { nome, materia } = req.body || {};
+  if (!nome || !String(nome).trim()) return res.status(400).json({ erro: 'Informe o nome do(a) professor(a).' });
+
+  const existe = await get('SELECT id FROM usuarios WHERE nome=?', [String(nome).trim()]);
+  if (existe) return res.status(409).json({ erro: 'Já existe um(a) professor(a) cadastrado(a) com esse nome.' });
+
+  const senhaTemp = gerarSenhaTemporaria();
+  await run(
+    'INSERT INTO usuarios (nome, email, senha_hash, perfil, materia, cargo) VALUES (?, ?, ?, ?, ?, ?)',
+    [String(nome).trim(), null, bcrypt.hashSync(senhaTemp, 10), 'professor', (materia || '').trim() || null, null]
+  );
+  await notificarGestao(`👤 Novo(a) professor(a) cadastrado(a): ${String(nome).trim()}.`);
+  res.json({ ok: true, senhaTemp });
+}));
+
 // Resetar a senha de qualquer usuário (iniciado pela gestão, sem pedido prévio)
 app.post('/api/usuarios/:id/resetar-senha', exigirLogin, exigirGestao, rota(async (req, res) => {
   const usuario = await get('SELECT * FROM usuarios WHERE id=?', [req.params.id]);
@@ -290,6 +308,28 @@ app.post('/api/estacoes/:id/devolucao', exigirLogin, exigirProfessor, rota(async
   res.json({ ok: true, mensagem: 'Devolução registrada. Obrigado!' });
 }));
 
+// Criar uma nova estação móvel (ex.: Estação D). O id vira uma letra/código
+// curto; a partir daí ela passa a existir também como recurso agendável.
+app.post('/api/estacoes', exigirLogin, exigirGestao, rota(async (req, res) => {
+  const idBruto = String(req.body?.id || '').trim().toUpperCase();
+  const capacidade = Number(req.body?.capacidade);
+  const local = String(req.body?.local || '').trim() || LOCAL_PADRAO;
+
+  if (!idBruto || !/^[A-Z0-9]{1,10}$/.test(idBruto)) {
+    return res.status(400).json({ erro: 'Use um identificador curto (ex.: D), só letras/números, sem espaços.' });
+  }
+  if (!Number.isInteger(capacidade) || capacidade < 1) {
+    return res.status(400).json({ erro: 'Informe a capacidade (quantidade de aparelhos) da nova estação.' });
+  }
+  const existe = await get('SELECT id FROM estacoes WHERE id=?', [idBruto]);
+  if (existe) return res.status(409).json({ erro: `Já existe uma Estação ${idBruto}.` });
+
+  await run('INSERT INTO estacoes (id, capacidade, qtd, local) VALUES (?, ?, ?, ?)',
+    [idBruto, capacidade, capacidade, local]);
+  await notificarGestao(`🆕 Nova estação móvel criada: Estação ${idBruto} (capacidade ${capacidade}).`);
+  res.json({ ok: true, id: idBruto });
+}));
+
 // Edição direta de capacidade/quantidade pela gestão (fora do fluxo de divergência)
 app.put('/api/estacoes/:id', exigirLogin, exigirGestao, rota(async (req, res) => {
   const e = await get('SELECT * FROM estacoes WHERE id=?', [req.params.id]);
@@ -382,6 +422,19 @@ app.get('/api/notificacoes', exigirLogin, exigirGestao, rota(async (_req, res) =
   res.json(await all('SELECT * FROM notificacoes ORDER BY id DESC LIMIT 100'));
 }));
 
+// Limpa os alertas (notificações) — ação irreversível, só gestão.
+app.delete('/api/notificacoes', exigirLogin, exigirGestao, rota(async (_req, res) => {
+  await run('DELETE FROM notificacoes');
+  res.json({ ok: true });
+}));
+
+// Limpa o histórico de retiradas/devoluções — ação irreversível, só gestão.
+// Não afeta o estado atual das estações (em uso/quantidade), só o log.
+app.delete('/api/registros', exigirLogin, exigirGestao, rota(async (_req, res) => {
+  await run('DELETE FROM registros');
+  res.json({ ok: true });
+}));
+
 // Gestão pode encerrar uma divergência depois de conferir o gabinete
 app.post('/api/estacoes/:id/resolver-divergencia', exigirLogin, exigirGestao, rota(async (req, res) => {
   const e = await get('SELECT * FROM estacoes WHERE id=?', [req.params.id]);
@@ -417,7 +470,8 @@ app.get('/api/agendamentos', exigirLogin, rota(async (req, res) => {
 
 app.post('/api/agendamentos', exigirLogin, rota(async (req, res) => {
   const { recurso, diaSemana, periodoId, turma, observacao } = req.body || {};
-  if (!RECURSOS.some(r => r.id === recurso)) return res.status(400).json({ erro: 'Selecione o que deseja agendar.' });
+  const recursos = await montarRecursos();
+  if (!recursos.some(r => r.id === recurso)) return res.status(400).json({ erro: 'Selecione o que deseja agendar.' });
   if (!DIAS_SEMANA.some(d => d.id === diaSemana)) return res.status(400).json({ erro: 'Selecione o dia da semana.' });
   if (!PERIODOS.some(p => p.id === periodoId)) return res.status(400).json({ erro: 'Selecione a aula/horário.' });
   if (recurso === 'sala_informatica' && !turma) {
