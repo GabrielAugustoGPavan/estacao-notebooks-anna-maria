@@ -423,15 +423,20 @@ app.get('/api/notificacoes', exigirLogin, exigirGestao, rota(async (_req, res) =
 }));
 
 // Limpa os alertas (notificações) — ação irreversível, só gestão.
+// Também tira a bandeira de "Divergência" das estações: sem o alerta que
+// explicava o motivo, não faz sentido a estação continuar presa nesse status.
 app.delete('/api/notificacoes', exigirLogin, exigirGestao, rota(async (_req, res) => {
   await run('DELETE FROM notificacoes');
+  await run('UPDATE estacoes SET divergencia=0');
   res.json({ ok: true });
 }));
 
 // Limpa o histórico de retiradas/devoluções — ação irreversível, só gestão.
-// Não afeta o estado atual das estações (em uso/quantidade), só o log.
+// Também tira a bandeira de "Divergência", pelo mesmo motivo acima.
+// Não afeta em_uso/quantidade — só o log e o status de divergência.
 app.delete('/api/registros', exigirLogin, exigirGestao, rota(async (_req, res) => {
   await run('DELETE FROM registros');
+  await run('UPDATE estacoes SET divergencia=0');
   res.json({ ok: true });
 }));
 
