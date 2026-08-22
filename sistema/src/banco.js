@@ -130,7 +130,9 @@ const TABELAS = [
     local         TEXT NOT NULL,
     professor_id  INTEGER REFERENCES usuarios(id),
     sala          TEXT,
-    qtd_retirada  INTEGER
+    qtd_retirada  INTEGER,
+    tipo          TEXT NOT NULL DEFAULT 'notebook' CHECK (tipo IN ('notebook','tablet')),
+    marca         TEXT NOT NULL DEFAULT 'TES Guardian'
   )`,
   `CREATE TABLE IF NOT EXISTS registros (
     id            ${ID_AUTO},
@@ -148,15 +150,22 @@ const TABELAS = [
     texto         TEXT NOT NULL,
     criada_em     TEXT NOT NULL
   )`,
-  // Agendamento fixo semanal (grade, no mesmo espírito da grade de horários da
-  // escola): cobre tanto "Sala de Informática" (turma toda) quanto reserva
-  // futura de uma Estação (A/B/C). Repete toda semana até ser cancelado.
+  // Agendamento com antecedência — pode ser: 'dia' (uma data específica),
+  // 'semana' (repete toda semana, sem data final) ou 'mes' (repete todo
+  // dia_semana dentro de um mês específico). Cobre tanto "Sala de Informática"
+  // (turma toda) quanto reserva futura de uma Estação (A/B/C/...).
+  // data_inicio/data_fim delimitam a vigência real da reserva, usados para
+  // checar conflito entre reservas de tipos diferentes que se sobrepõem.
   `CREATE TABLE IF NOT EXISTS agendamentos (
     id            ${ID_AUTO},
     usuario_id    INTEGER NOT NULL REFERENCES usuarios(id),
     recurso       TEXT NOT NULL,
+    tipo          TEXT NOT NULL DEFAULT 'semana' CHECK (tipo IN ('dia','semana','mes')),
     dia_semana    TEXT NOT NULL,
     periodo_id    TEXT NOT NULL,
+    mes           TEXT,
+    data_inicio   TEXT NOT NULL,
+    data_fim      TEXT NOT NULL,
     turma         TEXT,
     observacao    TEXT,
     status        TEXT NOT NULL DEFAULT 'confirmado' CHECK (status IN ('confirmado','cancelado')),
@@ -175,34 +184,47 @@ const TABELAS = [
 
 // Pequenas migrações para bancos já existentes (adiciona coluna se faltar).
 async function migrar() {
-  try {
-    if (usaPostgres) await run('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cargo TEXT');
-    else await run('ALTER TABLE usuarios ADD COLUMN cargo TEXT');
-  } catch (e) {
-    if (!/duplicate column|already exists/i.test(e.message)) throw e;
-  }
+  const adicionarColuna = async (tabela, coluna, definicao) => {
+    try {
+      if (usaPostgres) await run(`ALTER TABLE ${tabela} ADD COLUMN IF NOT EXISTS ${coluna} ${definicao}`);
+      else await run(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${definicao}`);
+    } catch (e) {
+      if (!/duplicate column|already exists/i.test(e.message)) throw e;
+    }
+  };
 
-  // A tabela agendamentos mudou de "data específica" para "grade semanal fixa"
-  // (dia_semana + periodo_id). Se o banco ainda tem o formato antigo, recria a
-  // tabela — são reservas futuras de teste, sem valor histórico a preservar.
+  await adicionarColuna('usuarios', 'cargo', 'TEXT');
+  await adicionarColuna('estacoes', 'tipo', "TEXT NOT NULL DEFAULT 'notebook'");
+  await adicionarColuna('estacoes', 'marca', "TEXT NOT NULL DEFAULT 'TES Guardian'");
+  // Estação C já existente em bancos antigos passa a ser da marca JEYTECH
+  await run("UPDATE estacoes SET marca='JEYTECH' WHERE id='C' AND marca='TES Guardian'");
+
+  // A tabela agendamentos ganhou tipo (dia/semana/mês) e vigência (data_inicio/
+  // data_fim). Se o banco está no formato mais antigo (por data única, sem
+  // "tipo") ou ainda mais antigo (por data corrida, coluna "data"), recria —
+  // são reservas futuras, sem valor histórico que justifique migração de dado.
   const colunas = usaPostgres
     ? await all("SELECT column_name FROM information_schema.columns WHERE table_name='agendamentos'")
     : await all("PRAGMA table_info(agendamentos)");
   const nomes = colunas.map(c => c.column_name || c.name);
-  if (nomes.includes('data')) {
-    await run('DROP TABLE agendamentos');
+  if (nomes.includes('data') || !nomes.includes('tipo')) {
+    await run('DROP TABLE IF EXISTS agendamentos');
     await run(`CREATE TABLE agendamentos (
       id            ${ID_AUTO},
       usuario_id    INTEGER NOT NULL REFERENCES usuarios(id),
       recurso       TEXT NOT NULL,
+      tipo          TEXT NOT NULL DEFAULT 'semana' CHECK (tipo IN ('dia','semana','mes')),
       dia_semana    TEXT NOT NULL,
       periodo_id    TEXT NOT NULL,
+      mes           TEXT,
+      data_inicio   TEXT NOT NULL,
+      data_fim      TEXT NOT NULL,
       turma         TEXT,
       observacao    TEXT,
       status        TEXT NOT NULL DEFAULT 'confirmado' CHECK (status IN ('confirmado','cancelado')),
       criado_em     TEXT NOT NULL
     )`);
-    console.log('[banco] Tabela agendamentos migrada para o formato de grade semanal fixa.');
+    console.log('[banco] Tabela agendamentos migrada para o formato dia/semana/mês.');
   }
 }
 
@@ -214,13 +236,20 @@ function gerarSenhaTemporaria() {
   return s;
 }
 
+// Data usada como "sem fim" para reservas do tipo 'semana' (indefinidas).
+const DATA_FIM_INDEFINIDA = '2099-12-31';
+
 // Monta a lista de recursos agendáveis: Sala de Informática + uma entrada por
 // estação móvel que existir de fato no banco no momento (em ordem alfabética).
+// O texto já reflete se a estação guarda notebooks ou tablets.
 async function montarRecursos() {
-  const estacoes = await all('SELECT id FROM estacoes ORDER BY id');
+  const estacoes = await all('SELECT id, tipo FROM estacoes ORDER BY id');
   return [
     { id: 'sala_informatica', nome: 'Sala de Informática (turma toda)' },
-    ...estacoes.map(e => ({ id: 'estacao_' + e.id, nome: `Estação ${e.id} (estação móvel)` })),
+    ...estacoes.map(e => ({
+      id: 'estacao_' + e.id,
+      nome: `Estação ${e.id} (${e.tipo === 'tablet' ? 'tablets' : 'notebooks'})`,
+    })),
   ];
 }
 
@@ -241,8 +270,9 @@ async function inicializar() {
       ['Gestão Escolar', 'gestao@eeannamaria.sp.gov.br', bcrypt.hashSync(SENHA_INICIAL_GESTAO, 10), 'gestao', null, 'Gestão Escolar']);
 
     for (const [id, cap] of [['A', 32], ['B', 32], ['C', 30]]) {
-      await run('INSERT INTO estacoes (id, capacidade, qtd, local) VALUES (?, ?, ?, ?)',
-        [id, cap, cap, LOCAL_PADRAO]);
+      const marca = id === 'C' ? 'JEYTECH' : 'TES Guardian';
+      await run('INSERT INTO estacoes (id, capacidade, qtd, local, tipo, marca) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, cap, cap, LOCAL_PADRAO, 'notebook', marca]);
     }
 
     console.log('[banco] Carga inicial criada:');
@@ -255,6 +285,6 @@ async function inicializar() {
 
 module.exports = {
   inicializar, all, get, run,
-  SALAS, CARGOS_ADMIN, LOCAL_PADRAO, DIAS_SEMANA, PERIODOS,
+  SALAS, CARGOS_ADMIN, LOCAL_PADRAO, DIAS_SEMANA, PERIODOS, DATA_FIM_INDEFINIDA,
   gerarSenhaTemporaria, montarRecursos,
 };

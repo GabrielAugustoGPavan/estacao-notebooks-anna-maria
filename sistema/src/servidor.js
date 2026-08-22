@@ -15,7 +15,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const {
   inicializar, all, get, run,
-  SALAS, CARGOS_ADMIN, LOCAL_PADRAO, DIAS_SEMANA, PERIODOS,
+  SALAS, CARGOS_ADMIN, LOCAL_PADRAO, DIAS_SEMANA, PERIODOS, DATA_FIM_INDEFINIDA,
   gerarSenhaTemporaria, montarRecursos,
 } = require('./banco');
 
@@ -30,6 +30,26 @@ app.use(express.json({ limit: '2mb' })); // limite maior: permite colar planilha
 app.use(express.static(path.join(__dirname, '..', 'publico')));
 
 const agora = () => new Date().toISOString();
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+const DIA_SEMANA_POR_INDICE = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+function diaSemanaDeData(dataStr) {
+  const [ano, mes, dia] = dataStr.split('-').map(Number);
+  return DIA_SEMANA_POR_INDICE[new Date(ano, mes - 1, dia).getDay()];
+}
+function limitesMes(mesStr) {
+  const [ano, mes] = mesStr.split('-').map(Number);
+  const ultimoDia = new Date(ano, mes, 0).getDate();
+  return { inicio: `${mesStr}-01`, fim: `${mesStr}-${String(ultimoDia).padStart(2, '0')}` };
+}
+// Horário atual no formato HH:MM, para achar em qual período/aula estamos agora
+function horaAgoraHM() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function periodoAtual() {
+  const hm = horaAgoraHM();
+  return PERIODOS.find(p => hm >= p.inicio && hm < p.fim) || null;
+}
 // Express 4 não captura erros de funções async — este envelope encaminha ao tratador
 const rota = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -226,11 +246,34 @@ app.get('/api/estacoes', exigirLogin, rota(async (req, res) => {
     ORDER BY e.id
   `);
 
+  // Reservas da grade que valem "agora" (dia da semana de hoje + aula do horário atual).
+  // Serve pra mostrar a estação como "Em uso" pelo professor que a reservou,
+  // mesmo que ele ainda não tenha feito a retirada física.
+  const diaAgora = DIA_SEMANA_POR_INDICE[new Date().getDay()];
+  const periodoAgora = periodoAtual();
+  const reservasAgora = {};
+  if (periodoAgora && diaAgora !== 'sabado' && diaAgora !== 'domingo') {
+    const hoje = hojeISO();
+    const linhasReserva = await all(`
+      SELECT ag.recurso, u.nome AS professor_nome, ag.turma
+      FROM agendamentos ag JOIN usuarios u ON u.id = ag.usuario_id
+      WHERE ag.status='confirmado' AND ag.dia_semana=? AND ag.periodo_id=?
+        AND ag.data_inicio <= ? AND ag.data_fim >= ?
+    `, [diaAgora, periodoAgora.id, hoje, hoje]);
+    for (const r of linhasReserva) reservasAgora[r.recurso] = r;
+  }
+  const reservaDe = e => {
+    if (e.em_uso) return null; // já em uso de verdade — não precisa do aviso de reserva
+    const r = reservasAgora['estacao_' + e.id];
+    return r ? { professorNome: r.professor_nome, turma: r.turma } : null;
+  };
+
   if (req.usuario.perfil === 'gestao') {
     return res.json(linhas.map(e => ({
       id: e.id, capacidade: e.capacidade, qtd: e.qtd,
       emUso: !!e.em_uso, divergencia: !!e.divergencia,
       local: e.local, professorNome: e.professor_nome, sala: e.sala,
+      tipo: e.tipo, marca: e.marca, reservadaAgora: reservaDe(e),
     })));
   }
   // Professor: SEM qtd real e SEM divergência — o servidor não envia esses campos
@@ -239,6 +282,7 @@ app.get('/api/estacoes', exigirLogin, rota(async (req, res) => {
     emUso: !!e.em_uso, local: e.local,
     professorNome: e.professor_nome,
     minha: e.professor_id === req.usuario.id,
+    tipo: e.tipo, marca: e.marca, reservadaAgora: reservaDe(e),
   })));
 }));
 
@@ -314,19 +358,21 @@ app.post('/api/estacoes', exigirLogin, exigirGestao, rota(async (req, res) => {
   const idBruto = String(req.body?.id || '').trim().toUpperCase();
   const capacidade = Number(req.body?.capacidade);
   const local = String(req.body?.local || '').trim() || LOCAL_PADRAO;
+  const tipo = req.body?.tipo === 'tablet' ? 'tablet' : 'notebook';
+  const marca = String(req.body?.marca || '').trim() || 'TES Guardian';
 
   if (!idBruto || !/^[A-Z0-9]{1,10}$/.test(idBruto)) {
     return res.status(400).json({ erro: 'Use um identificador curto (ex.: D), só letras/números, sem espaços.' });
   }
   if (!Number.isInteger(capacidade) || capacidade < 1) {
-    return res.status(400).json({ erro: 'Informe a capacidade (quantidade de aparelhos) da nova estação.' });
+    return res.status(400).json({ erro: `Informe a capacidade (quantidade de ${tipo === 'tablet' ? 'tablets' : 'notebooks'}) da nova estação.` });
   }
   const existe = await get('SELECT id FROM estacoes WHERE id=?', [idBruto]);
   if (existe) return res.status(409).json({ erro: `Já existe uma Estação ${idBruto}.` });
 
-  await run('INSERT INTO estacoes (id, capacidade, qtd, local) VALUES (?, ?, ?, ?)',
-    [idBruto, capacidade, capacidade, local]);
-  await notificarGestao(`🆕 Nova estação móvel criada: Estação ${idBruto} (capacidade ${capacidade}).`);
+  await run('INSERT INTO estacoes (id, capacidade, qtd, local, tipo, marca) VALUES (?, ?, ?, ?, ?, ?)',
+    [idBruto, capacidade, capacidade, local, tipo, marca]);
+  await notificarGestao(`🆕 Nova estação criada: Estação ${idBruto} (${tipo === 'tablet' ? 'tablets' : 'notebooks'}, capacidade ${capacidade}).`);
   res.json({ ok: true, id: idBruto });
 }));
 
@@ -453,13 +499,17 @@ app.post('/api/estacoes/:id/resolver-divergencia', exigirLogin, exigirGestao, ro
   res.json({ ok: true });
 }));
 
-// ---------- Agendamentos: grade semanal fixa (Sala de Informática e Estações) ----------
-// Reserva um horário da grade (dia da semana + aula) que repete toda semana,
-// no mesmo espírito da grade de horários oficial da escola — até ser cancelado.
+// ---------- Agendamentos: dia único, semana fixa ou mês inteiro ----------
+// Cada reserva tem uma "vigência" (data_inicio..data_fim) que define quando
+// ela vale de fato: um dia específico, indefinidamente (toda semana) ou só
+// dentro de um mês. Duas reservas do mesmo recurso/dia/aula só conflitam se
+// as vigências se sobrepõem — assim dá pra reservar "1º de outubro" mesmo
+// que outro professor já tenha a "sexta-feira" fixa em outro mês, por ex.
+
 app.get('/api/agendamentos', exigirLogin, rota(async (req, res) => {
   const { recurso } = req.query;
-  const condicoes = ["a.status='confirmado'"];
-  const params = [];
+  const condicoes = ["a.status='confirmado'", 'a.data_fim >= ?'];
+  const params = [hojeISO()];
   if (recurso) { condicoes.push('a.recurso=?'); params.push(recurso); }
   const linhas = await all(`
     SELECT a.*, u.nome AS professor_nome
@@ -467,18 +517,44 @@ app.get('/api/agendamentos', exigirLogin, rota(async (req, res) => {
     WHERE ${condicoes.join(' AND ')}
   `, params);
   res.json(linhas.map(a => ({
-    id: a.id, recurso: a.recurso, diaSemana: a.dia_semana, periodoId: a.periodo_id,
+    id: a.id, recurso: a.recurso, tipo: a.tipo, diaSemana: a.dia_semana, periodoId: a.periodo_id,
+    mes: a.mes, dataInicio: a.data_inicio, dataFim: a.data_fim,
     turma: a.turma, observacao: a.observacao,
     professorNome: a.professor_nome, minha: a.usuario_id === req.usuario.id,
   })));
 }));
 
 app.post('/api/agendamentos', exigirLogin, rota(async (req, res) => {
-  const { recurso, diaSemana, periodoId, turma, observacao } = req.body || {};
+  const { recurso, tipo, diaSemana, periodoId, data, mes, turma, observacao } = req.body || {};
   const recursos = await montarRecursos();
   if (!recursos.some(r => r.id === recurso)) return res.status(400).json({ erro: 'Selecione o que deseja agendar.' });
-  if (!DIAS_SEMANA.some(d => d.id === diaSemana)) return res.status(400).json({ erro: 'Selecione o dia da semana.' });
   if (!PERIODOS.some(p => p.id === periodoId)) return res.status(400).json({ erro: 'Selecione a aula/horário.' });
+  if (!['dia', 'semana', 'mes'].includes(tipo)) return res.status(400).json({ erro: 'Selecione o tipo de reserva: dia, semana ou mês.' });
+
+  let diaSemanaFinal, dataInicio, dataFim, mesFinal = null;
+
+  if (tipo === 'dia') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) return res.status(400).json({ erro: 'Selecione uma data válida.' });
+    if (data < hojeISO()) return res.status(400).json({ erro: 'Não é possível reservar uma data passada.' });
+    diaSemanaFinal = diaSemanaDeData(data);
+    if (diaSemanaFinal === 'sabado' || diaSemanaFinal === 'domingo') {
+      return res.status(400).json({ erro: 'Não é possível reservar sábado ou domingo — não há aula nesses dias.' });
+    }
+    dataInicio = data; dataFim = data;
+  } else if (tipo === 'mes') {
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return res.status(400).json({ erro: 'Selecione o mês.' });
+    if (!DIAS_SEMANA.some(d => d.id === diaSemana)) return res.status(400).json({ erro: 'Selecione o dia da semana.' });
+    diaSemanaFinal = diaSemana;
+    mesFinal = mes;
+    ({ inicio: dataInicio, fim: dataFim } = limitesMes(mes));
+    if (dataFim < hojeISO()) return res.status(400).json({ erro: 'Selecione um mês atual ou futuro.' });
+  } else {
+    if (!DIAS_SEMANA.some(d => d.id === diaSemana)) return res.status(400).json({ erro: 'Selecione o dia da semana.' });
+    diaSemanaFinal = diaSemana;
+    dataInicio = hojeISO();
+    dataFim = DATA_FIM_INDEFINIDA;
+  }
+
   if (recurso === 'sala_informatica' && !turma) {
     return res.status(400).json({ erro: 'Informe a turma que usará a Sala de Informática.' });
   }
@@ -486,17 +562,22 @@ app.post('/api/agendamentos', exigirLogin, rota(async (req, res) => {
   const conflito = await get(`
     SELECT a.id, u.nome FROM agendamentos a JOIN usuarios u ON u.id = a.usuario_id
     WHERE a.recurso=? AND a.dia_semana=? AND a.periodo_id=? AND a.status='confirmado'
-  `, [recurso, diaSemana, periodoId]);
+      AND a.data_inicio <= ? AND a.data_fim >= ?
+  `, [recurso, diaSemanaFinal, periodoId, dataFim, dataInicio]);
   if (conflito) {
-    return res.status(409).json({ erro: `Esse horário já está reservado por Prof. ${conflito.nome} toda semana. Escolha outro horário.` });
+    return res.status(409).json({ erro: `Esse horário já está reservado por Prof. ${conflito.nome} nesse período. Escolha outro horário.` });
   }
 
   await run(
-    `INSERT INTO agendamentos (usuario_id, recurso, dia_semana, periodo_id, turma, observacao, status, criado_em)
-     VALUES (?,?,?,?,?,?, 'confirmado', ?)`,
-    [req.usuario.id, recurso, diaSemana, periodoId, turma || null, observacao || null, agora()]
+    `INSERT INTO agendamentos (usuario_id, recurso, tipo, dia_semana, periodo_id, mes, data_inicio, data_fim, turma, observacao, status, criado_em)
+     VALUES (?,?,?,?,?,?,?,?,?,?, 'confirmado', ?)`,
+    [req.usuario.id, recurso, tipo, diaSemanaFinal, periodoId, mesFinal, dataInicio, dataFim, turma || null, observacao || null, agora()]
   );
-  res.json({ ok: true, mensagem: 'Horário reservado — vale para todas as semanas, até você cancelar.' });
+
+  const mensagem = tipo === 'dia' ? 'Reserva confirmada para essa data.'
+    : tipo === 'mes' ? 'Reserva confirmada para todo o mês selecionado.'
+    : 'Horário reservado — vale para todas as semanas, até você cancelar.';
+  res.json({ ok: true, mensagem });
 }));
 
 app.post('/api/agendamentos/:id/cancelar', exigirLogin, rota(async (req, res) => {
