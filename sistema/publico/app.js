@@ -30,8 +30,17 @@ function dataBr(iso){
   return `${d}/${m}/${a}`;
 }
 
-/* ================= GABINETE TES GUARDIAN (SVG) ================= */
+/* ================= GABINETE DE RECARGA (SVG) — cor/marca variam por estação ================= */
 function svgGabinete(e, visaoGestao){
+  const marca = e.marca || 'TES Guardian';
+  // Paleta clara (TES Guardian) vs. cinza-escuro (JEYTECH)
+  const paleta = marca === 'JEYTECH'
+    ? { corpo:'#5a5d62', borda:'#3d3f43', painel:'#65686d', divisor:'#4a4d51',
+        porta:'#61646a', portaBorda:'#3d3f43', furo:'#2e3033', pe:'#45474b', peBorda:'#303234' }
+    : { corpo:'#d9dcdf', borda:'#b9bec3', painel:'#e8eaec', divisor:'#c2c7cb',
+        porta:'#dfe2e5', portaBorda:'#b9bec3', furo:'#9aa0a6', pe:'#a7abaf', peBorda:'#7d8288' };
+  const corTexto = marca === 'JEYTECH' ? '#f2f3f4' : '#e8eaee';
+
   let slots = '';
   const total = 32;
   const cheios = visaoGestao ? Math.round(e.qtd/e.capacidade*total) : 0;
@@ -48,39 +57,39 @@ function svgGabinete(e, visaoGestao){
     let f='';
     for(const y0 of [52,92,132])
       for(let l=0;l<4;l++) for(let c=0;c<5;c++)
-        f += `<circle cx="${x0+c*7}" cy="${y0+l*6}" r="1.4" fill="#9aa0a6"/>`;
+        f += `<circle cx="${x0+c*7}" cy="${y0+l*6}" r="1.4" fill="${paleta.furo}"/>`;
     return f;
   }
   return `
   <svg class="gabinete" viewBox="-30 0 250 210">
-    <rect x="20" y="26" width="150" height="158" rx="4" fill="#d9dcdf" stroke="#b9bec3" stroke-width="2"/>
-    <rect x="28" y="34" width="134" height="144" fill="#e8eaec"/>
-    <rect x="28" y="82" width="134" height="6" fill="#c2c7cb"/>
-    <rect x="28" y="132" width="134" height="6" fill="#c2c7cb"/>
+    <rect x="20" y="26" width="150" height="158" rx="4" fill="${paleta.corpo}" stroke="${paleta.borda}" stroke-width="2"/>
+    <rect x="28" y="34" width="134" height="144" fill="${paleta.painel}"/>
+    <rect x="28" y="82" width="134" height="6" fill="${paleta.divisor}"/>
+    <rect x="28" y="132" width="134" height="6" fill="${paleta.divisor}"/>
     ${slots}
-    <rect x="28" y="170" width="134" height="8" fill="#c2c7cb"/>
+    <rect x="28" y="170" width="134" height="8" fill="${paleta.divisor}"/>
     <rect x="12" y="12" width="166" height="16" rx="3" fill="#4a4d52"/>
     <rect x="12" y="12" width="166" height="5" rx="3" fill="#5b5e64"/>
     <circle class="led" cx="170" cy="20" r="4" fill="${corLed}"/>
-    <text x="22" y="23" font-size="8" fill="#e8eaee" font-family="sans-serif" font-weight="bold">TES GUARDIAN</text>
+    <text x="22" y="23" font-size="8" fill="${corTexto}" font-family="sans-serif" font-weight="bold">${marca.toUpperCase()}</text>
     <g class="porta-esq">
-      <rect x="20" y="30" width="73" height="152" rx="3" fill="#dfe2e5" stroke="#b9bec3" stroke-width="2"/>
+      <rect x="20" y="30" width="73" height="152" rx="3" fill="${paleta.porta}" stroke="${paleta.portaBorda}" stroke-width="2"/>
       ${furos(36)}
     </g>
     <g class="porta-dir">
-      <rect x="97" y="30" width="73" height="152" rx="3" fill="#dfe2e5" stroke="#b9bec3" stroke-width="2"/>
+      <rect x="97" y="30" width="73" height="152" rx="3" fill="${paleta.porta}" stroke="${paleta.portaBorda}" stroke-width="2"/>
       ${furos(113)}
-      <circle cx="160" cy="106" r="6" fill="#b0b5ba" stroke="#8a8f94" stroke-width="1.5"/>
-      <rect x="158.6" y="102" width="2.8" height="8" rx="1.2" fill="#6d7277"/>
+      <circle cx="160" cy="106" r="6" fill="${paleta.pe}" stroke="${paleta.peBorda}" stroke-width="1.5"/>
+      <rect x="158.6" y="102" width="2.8" height="8" rx="1.2" fill="${paleta.peBorda}"/>
     </g>
-    <g fill="#7d8288">
+    <g fill="${paleta.peBorda}">
       <rect x="30" y="184" width="10" height="8" rx="2"/>
       <rect x="150" y="184" width="10" height="8" rx="2"/>
     </g>
-    <circle cx="35" cy="197" r="8" fill="#a7abaf" stroke="#7d8288" stroke-width="2"/>
-    <circle cx="155" cy="197" r="8" fill="#a7abaf" stroke="#7d8288" stroke-width="2"/>
-    <circle cx="35" cy="197" r="2.5" fill="#5b5e64"/>
-    <circle cx="155" cy="197" r="2.5" fill="#5b5e64"/>
+    <circle cx="35" cy="197" r="8" fill="${paleta.pe}" stroke="${paleta.peBorda}" stroke-width="2"/>
+    <circle cx="155" cy="197" r="8" fill="${paleta.pe}" stroke="${paleta.peBorda}" stroke-width="2"/>
+    <circle cx="35" cy="197" r="2.5" fill="${paleta.peBorda}"/>
+    <circle cx="155" cy="197" r="2.5" fill="${paleta.peBorda}"/>
   </svg>`;
 }
 
@@ -109,14 +118,16 @@ async function carregarPainel(){
   const minha = !gestao ? estacoes.find(x=>x.minha) : null;
 
   grade.innerHTML = estacoes.map(e=>{
+    const aparelho = e.tipo === 'tablet' ? 'tablets' : 'notebooks';
     let badge;
     if(gestao && e.divergencia) badge = '<span class="badge divergencia">Divergência</span>';
     else if(e.emUso)            badge = `<span class="badge em-uso">Em uso · Prof. ${e.professorNome}</span>`;
+    else if(e.reservadaAgora)   badge = `<span class="badge em-uso">Em uso · Prof. ${e.reservadaAgora.professorNome} (reservado)</span>`;
     else                        badge = '<span class="badge disponivel">Disponível</span>';
 
     const contagem = gestao
-      ? `<div class="contagem"><b>${e.qtd}</b> / ${e.capacidade} notebooks</div>`
-      : `<div class="contagem">Capacidade: <b>${e.capacidade}</b> notebooks</div>`;
+      ? `<div class="contagem"><b>${e.qtd}</b> / ${e.capacidade} ${aparelho}</div>`
+      : `<div class="contagem">Capacidade: <b>${e.capacidade}</b> ${aparelho}</div>`;
 
     let botao='';
     if(gestao){
@@ -128,6 +139,9 @@ async function carregarPainel(){
     } else if(minha){
       botao = `<button class="btn secundario" disabled>Retirar estação</button>
                <div class="aviso-bloqueio">⚠ Devolva primeiro a Estação ${minha.id} para retirar outra.</div>`;
+    } else if(e.reservadaAgora){
+      botao = `<button class="btn" onclick="abrirModal('${e.id}','retirada')">Retirar estação</button>
+               <div class="aviso-bloqueio">🗓 Reservada agora por Prof. ${e.reservadaAgora.professorNome}${e.reservadaAgora.turma?' ('+e.reservadaAgora.turma+')':''}.</div>`;
     } else {
       botao = `<button class="btn" onclick="abrirModal('${e.id}','retirada')">Retirar estação</button>`;
     }
@@ -194,20 +208,20 @@ async function resolverDivergencia(){
 }
 
 async function limparNotificacoes(){
-  if(!confirm('Apagar todos os alertas e observações? Essa ação não pode ser desfeita.')) return;
+  if(!confirm('Apagar todos os alertas e observações? Isso também tira a marcação de "Divergência" das estações. Essa ação não pode ser desfeita.')) return;
   try{
     await api('/notificacoes', {}, 'DELETE');
     toast('Alertas apagados.');
-    await carregarGestao();
+    await carregarPainel();
   }catch(err){ toast('⚠ '+err.message); }
 }
 
 async function limparHistorico(){
-  if(!confirm('Apagar todo o histórico de retiradas/devoluções? Essa ação não pode ser desfeita e não afeta o estado atual das estações.')) return;
+  if(!confirm('Apagar todo o histórico de retiradas/devoluções? Isso também tira a marcação de "Divergência" das estações. Essa ação não pode ser desfeita.')) return;
   try{
     await api('/registros', {}, 'DELETE');
     toast('Histórico apagado.');
-    await carregarGestao();
+    await carregarPainel();
   }catch(err){ toast('⚠ '+err.message); }
 }
 
@@ -220,7 +234,26 @@ function botaoRecurso(r, atual, onclickFn){
 
 function montarHtmlGrade(lista, recurso){
   const mapa = {};
-  lista.forEach(a=>{ mapa[a.diaSemana+'|'+a.periodoId] = a; });
+  lista.forEach(a=>{
+    const chave = a.diaSemana+'|'+a.periodoId;
+    (mapa[chave] = mapa[chave] || []).push(a);
+  });
+  const hoje = new Date().toISOString().slice(0,10);
+  // Quando há mais de uma reserva pra mesma célula (ex.: "toda semana" +
+  // uma exceção de "só um dia" que não se sobrepõe), mostra a que vale hoje;
+  // se nenhuma vale hoje ainda, mostra a próxima que vai valer.
+  function escolher(lista){
+    if(lista.length===1) return lista[0];
+    const vigenteHoje = lista.find(a=>a.dataInicio<=hoje && a.dataFim>=hoje);
+    if(vigenteHoje) return vigenteHoje;
+    return [...lista].sort((a,b)=>a.dataInicio.localeCompare(b.dataInicio))[0];
+  }
+  function rotuloTipo(a){
+    if(a.tipo==='dia') return `<span class="tag-tipo-agenda">📅 ${dataBr(a.dataInicio)}</span>`;
+    if(a.tipo==='mes') return `<span class="tag-tipo-agenda">🗓 ${a.mes}</span>`;
+    return '';
+  }
+
   let linhas = '<tr><th></th>' + diasSemana.map(d=>`<th>${d.nome.replace('-feira','')}</th>`).join('') + '</tr>';
   let turnoAnterior = null;
   periodos.forEach(p=>{
@@ -230,10 +263,12 @@ function montarHtmlGrade(lista, recurso){
     }
     linhas += `<tr><td class="rotulo-periodo">${p.rotulo}<small>${p.inicio}–${p.fim}</small></td>`;
     diasSemana.forEach(d=>{
-      const ag = mapa[d.id+'|'+p.id];
-      if(ag){
+      const lista2 = mapa[d.id+'|'+p.id];
+      if(lista2){
+        const ag = escolher(lista2);
         const podeCancelar = ag.minha || usuario.perfil==='gestao';
         linhas += `<td class="cel-agenda cel-ocupada ${ag.minha?'minha':''}">`
+          + rotuloTipo(ag)
           + `${ag.turma?ag.turma+'<br>':''}<small>Prof. ${ag.professorNome}</small>`
           + (podeCancelar ? ` <span class="cel-x" title="Cancelar reserva" onclick="cancelarAgendaCelula(${ag.id})">✕</span>` : '')
           + `</td>`;
@@ -286,20 +321,50 @@ async function selecionarRecursoEstacoesProf(id){
 }
 
 /* ---- Reservar/cancelar uma célula da grade ---- */
+const MAPA_DIA_INDICE = { segunda:1, terca:2, quarta:3, quinta:4, sexta:5 };
+function proximaDataParaDia(diaSemanaId){
+  const alvo = MAPA_DIA_INDICE[diaSemanaId];
+  const hoje = new Date();
+  const diff = (alvo - hoje.getDay() + 7) % 7;
+  const data = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + diff);
+  return data.toISOString().slice(0,10);
+}
+
+let agendaTipoAtual = 'semana';
+
 function abrirAgendaCelula(recurso, dia, periodoId){
   const p = periodos.find(x=>x.id===periodoId);
   const d = diasSemana.find(x=>x.id===dia);
   agendaCelulaAtiva = { recurso, dia, periodoId };
   document.getElementById('tituloAgendaCelula').textContent = `Reservar — ${d.nome}, ${p.rotulo}`;
-  document.getElementById('subAgendaCelula').textContent =
-    `${nomeRecurso(recurso)} · ${p.inicio}–${p.fim} · vale toda semana, até você cancelar.`;
+  document.getElementById('subAgendaCelula').textContent = `${nomeRecurso(recurso)} · ${p.inicio}–${p.fim}`;
   document.getElementById('campoTurmaAgenda2').style.display = recurso==='sala_informatica' ? 'block' : 'none';
   document.getElementById('inpTurmaAgenda2').value='';
   document.getElementById('inpObsAgenda2').value='';
   document.getElementById('erroAgendaCelula').classList.remove('visivel');
+
+  // Data padrão pro tipo "só um dia": a próxima ocorrência desse dia da semana.
+  // step=7 trava o seletor nativo pra só aceitar datas nesse mesmo dia da semana.
+  const proxima = proximaDataParaDia(dia);
+  const inpData = document.getElementById('inpDataAgenda2');
+  inpData.min = proxima; inpData.value = proxima; inpData.step = 7;
+  document.getElementById('rotuloDataAgenda2').textContent = `Data (só ${d.nome})`;
+
+  const inpMes = document.getElementById('inpMesAgenda2');
+  inpMes.min = new Date().toISOString().slice(0,7);
+  inpMes.value = new Date().toISOString().slice(0,7);
+
+  escolherTipoAgenda('semana');
   document.getElementById('sombraAgendaCelula').classList.add('visivel');
 }
 function fecharAgendaCelula(){ document.getElementById('sombraAgendaCelula').classList.remove('visivel'); }
+
+function escolherTipoAgenda(tipo){
+  agendaTipoAtual = tipo;
+  [...document.getElementById('seletorTipoAgenda').children].forEach(b=>b.classList.toggle('ativo', b.dataset.tipo===tipo));
+  document.getElementById('campoDataAgenda2').style.display = tipo==='dia' ? 'block' : 'none';
+  document.getElementById('campoMesAgenda2').style.display = tipo==='mes' ? 'block' : 'none';
+}
 
 async function confirmarAgendaCelula(){
   const erro = document.getElementById('erroAgendaCelula');
@@ -307,16 +372,20 @@ async function confirmarAgendaCelula(){
   try{
     await api('/agendamentos', {
       recurso: agendaCelulaAtiva.recurso,
-      diaSemana: agendaCelulaAtiva.dia,
+      tipo: agendaTipoAtual,
+      diaSemana: agendaTipoAtual === 'dia' ? undefined : agendaCelulaAtiva.dia,
       periodoId: agendaCelulaAtiva.periodoId,
+      data: agendaTipoAtual === 'dia' ? document.getElementById('inpDataAgenda2').value : undefined,
+      mes: agendaTipoAtual === 'mes' ? document.getElementById('inpMesAgenda2').value : undefined,
       turma: document.getElementById('inpTurmaAgenda2').value.trim() || undefined,
       observacao: document.getElementById('inpObsAgenda2').value.trim() || undefined,
     });
     fecharAgendaCelula();
-    toast('✅ Horário reservado — vale toda semana.');
+    toast('✅ Reserva confirmada.');
     await recarregarGradeAtual();
   }catch(err){ erro.textContent = err.message; erro.classList.add('visivel'); }
 }
+
 
 async function cancelarAgendaCelula(id){
   try{
@@ -448,10 +517,13 @@ async function criarEstacao(){
   try{
     const id = document.getElementById('inpIdNovaEstacao').value.trim().toUpperCase();
     const capacidade = Number(document.getElementById('inpCapNovaEstacao').value);
-    await api('/estacoes', { id, capacidade });
+    const tipo = document.getElementById('selTipoNovaEstacao').value;
+    const marca = document.getElementById('inpMarcaNovaEstacao').value.trim();
+    await api('/estacoes', { id, capacidade, tipo, marca });
     toast(`✅ Estação ${id} criada.`);
     document.getElementById('inpIdNovaEstacao').value='';
     document.getElementById('inpCapNovaEstacao').value='';
+    document.getElementById('inpMarcaNovaEstacao').value='';
     // a lista de recursos agendáveis mudou (nova estação = novo recurso) — recarrega
     recursos = await api('/recursos');
     document.getElementById('selEstacaoEditar').innerHTML = '';
@@ -607,7 +679,7 @@ async function abrirPainel(){
   document.getElementById('tituloPainel').textContent = gestao
     ? 'Painel das estações' : `Olá, Prof. ${usuario.nome}!`;
   document.getElementById('subPainel').textContent = gestao
-    ? 'Acompanhe em tempo real o estado dos 3 gabinetes TES Guardian.'
+    ? 'Acompanhe em tempo real o estado de cada estação.'
     : 'O que você deseja fazer?';
   document.getElementById('blocoNotificacoes').classList.toggle('oculto', !gestao);
   document.getElementById('blocoHistorico').classList.toggle('oculto', !gestao);
@@ -633,6 +705,7 @@ async function abrirPainel(){
     if(gestao){ abaAtual='estacoes'; mudarAba('estacoes'); await carregarPainel(); }
     else { abaAtual='home'; }
   }catch(err){ toast('⚠ '+err.message); }
+  document.getElementById('btnFAQ').classList.remove('oculto');
   clearInterval(atualizador);
   atualizador = setInterval(()=>{
     if(abaAtual==='estacoes' || abaAtual==='estacoes-prof') carregarPainel().catch(()=>{});
@@ -649,6 +722,12 @@ function sair(){
   document.getElementById('telaPainel').classList.add('oculto');
   document.getElementById('telaSenha').classList.add('oculto');
   document.getElementById('telaLogin').classList.remove('oculto');
+  document.getElementById('btnFAQ').classList.add('oculto');
+  document.getElementById('painelFAQ').classList.add('oculto');
+}
+
+function alternarFAQ(){
+  document.getElementById('painelFAQ').classList.toggle('oculto');
 }
 
 /* ================= MODAL RETIRADA / DEVOLUÇÃO ================= */

@@ -246,6 +246,19 @@
               <input type="number" id="inpCapNovaEstacao" min="1" placeholder="ex.: 20">
             </div>
           </div>
+          <div class="linha-botoes">
+            <div class="campo" style="flex:1">
+              <label for="selTipoNovaEstacao">Tipo de aparelho</label>
+              <select id="selTipoNovaEstacao">
+                <option value="notebook">Notebooks</option>
+                <option value="tablet">Tablets</option>
+              </select>
+            </div>
+            <div class="campo" style="flex:1">
+              <label for="inpMarcaNovaEstacao">Marca do gabinete</label>
+              <input type="text" id="inpMarcaNovaEstacao" placeholder="ex.: TES Guardian">
+            </div>
+          </div>
           <button class="btn" onclick="criarEstacao()">Criar estação</button>
         </div>
         <div class="bloco-gestao" style="margin-top:0">
@@ -344,6 +357,24 @@
     <h3 id="tituloAgendaCelula"></h3>
     <p class="sub" id="subAgendaCelula"></p>
     <div class="erro" id="erroAgendaCelula"></div>
+
+    <div class="campo">
+      <label>Repetir</label>
+      <div class="seletor-tipo-agenda" id="seletorTipoAgenda">
+        <button type="button" data-tipo="dia" onclick="escolherTipoAgenda('dia')">Só um dia</button>
+        <button type="button" data-tipo="semana" onclick="escolherTipoAgenda('semana')">Toda semana</button>
+        <button type="button" data-tipo="mes" onclick="escolherTipoAgenda('mes')">Um mês</button>
+      </div>
+    </div>
+    <div class="campo" id="campoDataAgenda2" style="display:none">
+      <label for="inpDataAgenda2" id="rotuloDataAgenda2">Data</label>
+      <input type="date" id="inpDataAgenda2">
+    </div>
+    <div class="campo" id="campoMesAgenda2" style="display:none">
+      <label for="inpMesAgenda2">Mês</label>
+      <input type="month" id="inpMesAgenda2">
+    </div>
+
     <div class="campo" id="campoTurmaAgenda2">
       <label for="inpTurmaAgenda2">Turma</label>
       <input type="text" id="inpTurmaAgenda2" placeholder="ex.: 8º B">
@@ -357,6 +388,18 @@
       <button class="btn" onclick="confirmarAgendaCelula()">Reservar</button>
     </div>
   </div>
+</div>
+
+<!-- ================= FAQ FLUTUANTE (só aparece logado) ================= -->
+<button id="btnFAQ" class="fab-faq oculto" onclick="alternarFAQ()" title="Dúvidas frequentes">❓</button>
+<div id="painelFAQ" class="painel-faq oculto">
+  <h3>❓ Dúvidas frequentes</h3>
+  <p class="sub">Problemas comuns com notebooks, tablets e Chromebooks — resolva rapidinho.</p>
+  <div class="item-faq">🖱️ <b>O touchpad do notebook não responde?</b><br>Aperte a tecla <b>F9</b> nos notebooks Positivo — ela liga/desliga o touchpad.</div>
+  <div class="item-faq">🔄 <b>Precisa girar a tela do Chromebook Samsung?</b><br>Aperte <b>Ctrl + Shift + Atualizar</b> ao mesmo tempo.</div>
+  <div class="item-faq">🔑 <b>Não lembra o usuário de login?</b><br>Na Microsoft use <b>@professor</b>; no Chromebook (Google) use <b>@prof</b>. Para alunos: <b>@aluno</b> (Microsoft) ou <b>@al</b> (Google).</div>
+  <div class="item-faq">🔋 <b>Como desligar um tablet?</b><br>Segure o botão de <b>ligar/desligar</b> junto com o de <b>diminuir o volume</b> e toque em "Desligar".</div>
+  <div class="item-faq">🏷️ <b>Não sabe de qual estação é um notebook?</b><br>Observe a <b>etiqueta colada no verso</b> — ela indica a estação correspondente.</div>
 </div>
 
 <div class="toast" id="toast"></div>
