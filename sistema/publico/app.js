@@ -240,18 +240,18 @@ function montarHtmlGrade(lista, recurso, contexto){
   });
   const hoje = new Date().toISOString().slice(0,10);
   // Quando há mais de uma reserva pra mesma célula (ex.: "toda semana" +
-  // uma exceção de "só um dia" que não se sobrepõe), mostra a que vale hoje;
-  // se nenhuma vale hoje ainda, mostra a próxima que vai valer.
+  // uma exceção que não se sobrepõe), mostra a que vale hoje; se nenhuma
+  // vale hoje ainda, mostra a próxima que vai valer.
   function escolher(lista){
     if(lista.length===1) return lista[0];
     const vigenteHoje = lista.find(a=>a.dataInicio<=hoje && a.dataFim>=hoje);
     if(vigenteHoje) return vigenteHoje;
     return [...lista].sort((a,b)=>a.dataInicio.localeCompare(b.dataInicio))[0];
   }
-  function rotuloTipo(a){
-    if(a.tipo==='dia') return `<span class="tag-tipo-agenda">📅 ${dataBr(a.dataInicio)}</span>`;
-    if(a.tipo==='mes') return `<span class="tag-tipo-agenda">🗓 ${a.mes}</span>`;
-    return '';
+  function rotuloVigencia(a){
+    if(a.indefinida) return '';
+    if(a.dataInicio===a.dataFim) return `<span class="tag-tipo-agenda">📅 ${dataBr(a.dataInicio)}</span>`;
+    return `<span class="tag-tipo-agenda">📅 ${dataBr(a.dataInicio)}–${dataBr(a.dataFim)}</span>`;
   }
 
   let linhas = '<tr><th></th>' + diasSemana.map(d=>`<th>${d.nome.replace('-feira','')}</th>`).join('') + '</tr>';
@@ -268,7 +268,7 @@ function montarHtmlGrade(lista, recurso, contexto){
         const ag = escolher(lista2);
         const podeCancelar = ag.minha || usuario.perfil==='gestao';
         linhas += `<td class="cel-agenda cel-ocupada ${ag.minha?'minha':''}">`
-          + rotuloTipo(ag)
+          + rotuloVigencia(ag)
           + `${ag.turma?ag.turma+'<br>':''}<small>Prof. ${ag.professorNome}</small>`
           + (podeCancelar ? ` <span class="cel-x" title="Cancelar reserva" onclick="cancelarAgendaCelula(${ag.id})">✕</span>` : '')
           + `</td>`;
@@ -286,43 +286,46 @@ async function carregarGradeEm(tabelaId, recurso, contexto){
   document.getElementById(tabelaId).innerHTML = montarHtmlGrade(lista, recurso, contexto);
 }
 
-/* ---- Tipo de reserva (dia/semana/mês) — escolhido no topo, antes de clicar na grade ---- */
+/* ---- Vigência da reserva (De/Até) — escolhida no topo, antes de clicar na grade ---- */
 const hojeISO = () => new Date().toISOString().slice(0,10);
-const mesAtualISO = () => new Date().toISOString().slice(0,7);
-let tipoAgendaTopo = { principal:'semana', estacoesProf:'semana' };
 
 function idsContexto(contexto){
   const sufixo = contexto === 'principal' ? 'Principal' : 'EstacoesProf';
   return {
-    seletor: 'seletorTipoAgenda'+sufixo,
-    campoData: 'campoDataTopo'+sufixo, inpData: 'inpDataTopo'+sufixo,
-    campoMes: 'campoMesTopo'+sufixo, inpMes: 'inpMesTopo'+sufixo,
+    inpDe: 'inpDe'+sufixo, inpAte: 'inpAte'+sufixo,
+    campoAte: 'campoAte'+sufixo, chkIndefinido: 'chkIndefinido'+sufixo,
   };
 }
 
-function escolherTipoAgendaTopo(contexto, tipo){
-  tipoAgendaTopo[contexto] = tipo;
+function alternarIndefinido(contexto){
   const ids = idsContexto(contexto);
-  [...document.getElementById(ids.seletor).children].forEach(b=>b.classList.toggle('ativo', b.dataset.tipo===tipo));
-  document.getElementById(ids.campoData).classList.toggle('oculto', tipo!=='dia');
-  document.getElementById(ids.campoMes).classList.toggle('oculto', tipo!=='mes');
+  const indefinido = document.getElementById(ids.chkIndefinido).checked;
+  document.getElementById(ids.campoAte).classList.toggle('oculto', indefinido);
 }
 
-function prepararControlesTipoAgenda(contexto){
-  tipoAgendaTopo[contexto] = 'semana';
+function ajustarMinAte(contexto){
   const ids = idsContexto(contexto);
-  escolherTipoAgendaTopo(contexto, 'semana');
-  const inpData = document.getElementById(ids.inpData);
-  inpData.min = hojeISO(); if(!inpData.value || inpData.value < hojeISO()) inpData.value = hojeISO();
-  const inpMes = document.getElementById(ids.inpMes);
-  inpMes.min = mesAtualISO(); if(!inpMes.value || inpMes.value < mesAtualISO()) inpMes.value = mesAtualISO();
+  const de = document.getElementById(ids.inpDe).value || hojeISO();
+  const inpAte = document.getElementById(ids.inpAte);
+  inpAte.min = de;
+  if(!inpAte.value || inpAte.value < de) inpAte.value = de;
+}
+
+function prepararControlesVigencia(contexto){
+  const ids = idsContexto(contexto);
+  const inpDe = document.getElementById(ids.inpDe);
+  inpDe.min = hojeISO();
+  if(!inpDe.value || inpDe.value < hojeISO()) inpDe.value = hojeISO();
+  document.getElementById(ids.chkIndefinido).checked = true;
+  ajustarMinAte(contexto);
+  alternarIndefinido(contexto);
 }
 
 /* ---- Grade dentro da aba "Agendamentos" da gestão (todos os recursos) ---- */
 async function mostrarAgendamentosGestao(){
   document.getElementById('tituloAgendaSecao').textContent = '🗓 Grade semanal de agendamentos';
   document.getElementById('seletorRecursoAgenda').classList.remove('oculto');
-  prepararControlesTipoAgenda('principal');
+  prepararControlesVigencia('principal');
   await selecionarRecursoAgendaGestao(recursoAgendaGestao);
 }
 async function selecionarRecursoAgendaGestao(id){
@@ -341,8 +344,8 @@ function abrirAgendaSalaProfessor(){
   document.getElementById('btnVoltarAgenda').classList.remove('oculto');
   document.getElementById('seletorRecursoAgenda').classList.add('oculto');
   document.getElementById('tituloAgendaSecao').textContent = '🗓 Agendamento da Sala de Informática';
-  document.getElementById('subPainel').textContent = 'Escolha o tipo de reserva e clique num horário livre.';
-  prepararControlesTipoAgenda('principal');
+  document.getElementById('subPainel').textContent = 'Escolha o período da reserva e clique num horário livre.';
+  prepararControlesVigencia('principal');
   carregarGradeEm('tabelaAgenda', 'sala_informatica', 'principal').catch(err=>toast('⚠ '+err.message));
 }
 
@@ -355,48 +358,30 @@ async function selecionarRecursoEstacoesProf(id){
 }
 
 /* ---- Reservar/cancelar uma célula da grade ---- */
-const MAPA_DIA_INDICE = { segunda:1, terca:2, quarta:3, quinta:4, sexta:5 };
-function proximaDataParaDia(diaSemanaId){
-  const alvo = MAPA_DIA_INDICE[diaSemanaId];
-  const hoje = new Date();
-  const diff = (alvo - hoje.getDay() + 7) % 7;
-  const data = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + diff);
-  return data.toISOString().slice(0,10);
-}
-
 function abrirAgendaCelula(recurso, dia, periodoId, contexto){
   const p = periodos.find(x=>x.id===periodoId);
   const d = diasSemana.find(x=>x.id===dia);
-  const tipo = tipoAgendaTopo[contexto];
   const ids = idsContexto(contexto);
+  const indefinido = document.getElementById(ids.chkIndefinido).checked;
+  const dataInicio = document.getElementById(ids.inpDe).value;
+  const dataFim = indefinido ? null : document.getElementById(ids.inpAte).value;
 
-  // Não dá pra marcar um dia que já passou: valida a data/mês escolhidos no topo
-  if(tipo === 'dia'){
-    const dataEscolhida = document.getElementById(ids.inpData).value;
-    if(!dataEscolhida || dataEscolhida < hojeISO()){
-      toast('⚠ Escolha uma data válida (hoje ou no futuro) antes de clicar num horário.');
-      return;
-    }
-    // a data escolhida no topo precisa cair no mesmo dia da semana da coluna clicada
-    const [ano,mes,diaNum] = dataEscolhida.split('-').map(Number);
-    const indiceReal = new Date(ano, mes-1, diaNum).getDay();
-    if(indiceReal !== MAPA_DIA_INDICE[dia]){
-      toast(`⚠ A data escolhida não cai numa ${d.nome}. Ajuste a data ou clique noutra coluna.`);
-      return;
-    }
+  // Não dá pra marcar um dia que já passou
+  if(!dataInicio || dataInicio < hojeISO()){
+    toast('⚠ Escolha uma data de início válida (hoje ou no futuro) antes de clicar num horário.');
+    return;
   }
-  if(tipo === 'mes'){
-    const mesEscolhido = document.getElementById(ids.inpMes).value;
-    if(!mesEscolhido || mesEscolhido < mesAtualISO()){
-      toast('⚠ Escolha um mês válido (atual ou futuro) antes de clicar num horário.');
-      return;
-    }
+  if(!indefinido && (!dataFim || dataFim < dataInicio)){
+    toast('⚠ A data final precisa ser igual ou depois da data de início.');
+    return;
   }
 
-  agendaCelulaAtiva = { recurso, dia, periodoId, contexto, tipo };
-  const rotuloTipo = tipo==='dia' ? 'só esse dia' : tipo==='mes' ? 'só nesse mês' : 'toda semana';
+  agendaCelulaAtiva = { recurso, dia, periodoId, contexto, dataInicio, dataFim };
+  const rotuloVigencia = indefinido ? 'toda semana, até cancelar'
+    : dataInicio===dataFim ? `só ${dataBr(dataInicio)}`
+    : `de ${dataBr(dataInicio)} até ${dataBr(dataFim)}`;
   document.getElementById('tituloAgendaCelula').textContent = `Reservar — ${d.nome}, ${p.rotulo}`;
-  document.getElementById('subAgendaCelula').textContent = `${nomeRecurso(recurso)} · ${p.inicio}–${p.fim} · ${rotuloTipo}`;
+  document.getElementById('subAgendaCelula').textContent = `${nomeRecurso(recurso)} · ${p.inicio}–${p.fim} · ${rotuloVigencia}`;
   document.getElementById('campoTurmaAgenda2').style.display = recurso==='sala_informatica' ? 'block' : 'none';
   document.getElementById('inpTurmaAgenda2').value='';
   document.getElementById('inpObsAgenda2').value='';
@@ -408,16 +393,13 @@ function fecharAgendaCelula(){ document.getElementById('sombraAgendaCelula').cla
 async function confirmarAgendaCelula(){
   const erro = document.getElementById('erroAgendaCelula');
   erro.classList.remove('visivel');
-  const { contexto, tipo } = agendaCelulaAtiva;
-  const ids = idsContexto(contexto);
   try{
     await api('/agendamentos', {
       recurso: agendaCelulaAtiva.recurso,
-      tipo,
-      diaSemana: tipo === 'dia' ? undefined : agendaCelulaAtiva.dia,
+      diaSemana: agendaCelulaAtiva.dia,
       periodoId: agendaCelulaAtiva.periodoId,
-      data: tipo === 'dia' ? document.getElementById(ids.inpData).value : undefined,
-      mes: tipo === 'mes' ? document.getElementById(ids.inpMes).value : undefined,
+      dataInicio: agendaCelulaAtiva.dataInicio,
+      dataFim: agendaCelulaAtiva.dataFim || undefined,
       turma: document.getElementById('inpTurmaAgenda2').value.trim() || undefined,
       observacao: document.getElementById('inpObsAgenda2').value.trim() || undefined,
     });
@@ -451,7 +433,7 @@ function abrirEstacoesProfessor(){
   document.getElementById('btnVoltarEstacoes').classList.remove('oculto');
   document.getElementById('blocoAgendaEstacoesProfessor').classList.remove('oculto');
   document.getElementById('subPainel').textContent = 'Use o botão de cada estação para registrar a retirada ou devolução dos notebooks/tablets.';
-  prepararControlesTipoAgenda('estacoesProf');
+  prepararControlesVigencia('estacoesProf');
   carregarPainel().catch(err=>toast('⚠ '+err.message));
   selecionarRecursoEstacoesProf(recursoAgendaEstacoesProf).catch(err=>toast('⚠ '+err.message));
 }

@@ -153,6 +153,12 @@
         border-radius:9px; font-size:.78rem; cursor:pointer; font-weight:600; color:#66748a; font-family:inherit;}
   .seletor-tipo-agenda button.ativo{border-color:var(--azul); background:#e9f1fb; color:var(--azul);}
 
+  .linha-vigencia{display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:16px;}
+  .linha-vigencia .campo{margin-bottom:0; max-width:170px;}
+  .opcao-indefinida{display:flex; align-items:center; gap:7px; font-size:.8rem; color:#44536a;
+        cursor:pointer; padding-bottom:10px; font-weight:500;}
+  .opcao-indefinida input{width:16px; height:16px; cursor:pointer;}
+
   table.grade-horarios{width:100%; border-collapse:collapse; font-size:.74rem; min-width:640px;}
   .grade-horarios th{background:#f4f7fb; color:#44536a; padding:8px 6px; font-size:.72rem; border:1px solid #e8edf4;}
   .grade-horarios .rotulo-periodo{background:#f4f7fb; color:#44536a; font-weight:600; padding:8px 8px;

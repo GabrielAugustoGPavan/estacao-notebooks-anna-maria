@@ -152,20 +152,21 @@
       </div>
       <div class="bloco-gestao oculto" id="blocoAgendaEstacoesProfessor">
         <h3>🗓 Reservar uma estação com antecedência</h3>
-        <p class="explic">Escolha a estação, o tipo de reserva e clique num horário livre.</p>
+        <p class="explic">Escolha a estação, o período da reserva e clique num horário livre.</p>
         <div class="seletor-recurso" id="seletorRecursoEstacoesProf"></div>
-        <div class="seletor-tipo-agenda" id="seletorTipoAgendaEstacoesProf">
-          <button type="button" class="ativo" data-tipo="semana" onclick="escolherTipoAgendaTopo('estacoesProf','semana')">Toda semana</button>
-          <button type="button" data-tipo="dia" onclick="escolherTipoAgendaTopo('estacoesProf','dia')">Só um dia</button>
-          <button type="button" data-tipo="mes" onclick="escolherTipoAgendaTopo('estacoesProf','mes')">Um mês</button>
-        </div>
-        <div class="campo oculto" id="campoDataTopoEstacoesProf" style="max-width:220px">
-          <label for="inpDataTopoEstacoesProf">Data</label>
-          <input type="date" id="inpDataTopoEstacoesProf">
-        </div>
-        <div class="campo oculto" id="campoMesTopoEstacoesProf" style="max-width:220px">
-          <label for="inpMesTopoEstacoesProf">Mês</label>
-          <input type="month" id="inpMesTopoEstacoesProf">
+        <div class="linha-vigencia">
+          <div class="campo">
+            <label for="inpDeEstacoesProf">De</label>
+            <input type="date" id="inpDeEstacoesProf" onchange="ajustarMinAte('estacoesProf')">
+          </div>
+          <div class="campo" id="campoAteEstacoesProf">
+            <label for="inpAteEstacoesProf">Até</label>
+            <input type="date" id="inpAteEstacoesProf">
+          </div>
+          <label class="opcao-indefinida">
+            <input type="checkbox" id="chkIndefinidoEstacoesProf" checked onchange="alternarIndefinido('estacoesProf')">
+            Sem data para terminar (toda semana)
+          </label>
         </div>
         <div style="overflow-x:auto"><table class="grade-horarios" id="tabelaAgendaEstacoesProfessor"></table></div>
       </div>
@@ -176,20 +177,21 @@
       <button class="btn secundario pequeno oculto" id="btnVoltarAgenda" onclick="voltarHomeProfessor()" style="margin-bottom:16px">← Voltar</button>
       <div class="bloco-gestao" style="margin-top:0">
         <h3 id="tituloAgendaSecao">🗓 Grade semanal de agendamentos</h3>
-        <p class="explic">Escolha o tipo de reserva e clique num horário livre.</p>
+        <p class="explic">Escolha o período da reserva e clique num horário livre.</p>
         <div class="seletor-recurso" id="seletorRecursoAgenda"></div>
-        <div class="seletor-tipo-agenda" id="seletorTipoAgendaPrincipal">
-          <button type="button" class="ativo" data-tipo="semana" onclick="escolherTipoAgendaTopo('principal','semana')">Toda semana</button>
-          <button type="button" data-tipo="dia" onclick="escolherTipoAgendaTopo('principal','dia')">Só um dia</button>
-          <button type="button" data-tipo="mes" onclick="escolherTipoAgendaTopo('principal','mes')">Um mês</button>
-        </div>
-        <div class="campo oculto" id="campoDataTopoPrincipal" style="max-width:220px">
-          <label for="inpDataTopoPrincipal">Data</label>
-          <input type="date" id="inpDataTopoPrincipal">
-        </div>
-        <div class="campo oculto" id="campoMesTopoPrincipal" style="max-width:220px">
-          <label for="inpMesTopoPrincipal">Mês</label>
-          <input type="month" id="inpMesTopoPrincipal">
+        <div class="linha-vigencia">
+          <div class="campo">
+            <label for="inpDePrincipal">De</label>
+            <input type="date" id="inpDePrincipal" onchange="ajustarMinAte('principal')">
+          </div>
+          <div class="campo" id="campoAtePrincipal">
+            <label for="inpAtePrincipal">Até</label>
+            <input type="date" id="inpAtePrincipal">
+          </div>
+          <label class="opcao-indefinida">
+            <input type="checkbox" id="chkIndefinidoPrincipal" checked onchange="alternarIndefinido('principal')">
+            Sem data para terminar (toda semana)
+          </label>
         </div>
         <div style="overflow-x:auto"><table class="grade-horarios" id="tabelaAgenda"></table></div>
       </div>
