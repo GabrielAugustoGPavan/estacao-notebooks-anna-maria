@@ -269,7 +269,7 @@ function montarHtmlGrade(lista, recurso, contexto){
         const podeCancelar = ag.minha || usuario.perfil==='gestao';
         linhas += `<td class="cel-agenda cel-ocupada ${ag.minha?'minha':''}">`
           + rotuloVigencia(ag)
-          + `${ag.turma?ag.turma+'<br>':''}<small>Prof. ${ag.professorNome}</small>`
+          + `${ag.turma?ag.turma+'<br>':''}${ag.sala?ag.sala+'<br>':''}<small>Prof. ${ag.professorNome}</small>`
           + (podeCancelar ? ` <span class="cel-x" title="Cancelar reserva" onclick="cancelarAgendaCelula(${ag.id})">✕</span>` : '')
           + `</td>`;
       } else {
@@ -358,7 +358,7 @@ async function selecionarRecursoEstacoesProf(id){
 }
 
 /* ---- Reservar/cancelar uma célula da grade ---- */
-function abrirAgendaCelula(recurso, dia, periodoId, contexto){
+async function abrirAgendaCelula(recurso, dia, periodoId, contexto){
   const p = periodos.find(x=>x.id===periodoId);
   const d = diasSemana.find(x=>x.id===dia);
   const ids = idsContexto(contexto);
@@ -382,7 +382,18 @@ function abrirAgendaCelula(recurso, dia, periodoId, contexto){
     : `de ${dataBr(dataInicio)} até ${dataBr(dataFim)}`;
   document.getElementById('tituloAgendaCelula').textContent = `Reservar — ${d.nome}, ${p.rotulo}`;
   document.getElementById('subAgendaCelula').textContent = `${nomeRecurso(recurso)} · ${p.inicio}–${p.fim} · ${rotuloVigencia}`;
-  document.getElementById('campoTurmaAgenda2').style.display = recurso==='sala_informatica' ? 'block' : 'none';
+  const ehSalaInformatica = recurso === 'sala_informatica';
+  document.getElementById('campoTurmaAgenda2').style.display = ehSalaInformatica ? 'block' : 'none';
+  document.getElementById('campoSalaAgenda2').style.display = ehSalaInformatica ? 'none' : 'block';
+  if(!ehSalaInformatica){
+    if(!salas.length) salas = await api('/salas');
+    const selSala = document.getElementById('selSalaAgenda2');
+    if(!selSala.options.length || selSala.options.length !== salas.length + 1){
+      selSala.innerHTML = '<option value="">— selecione a sala —</option>'
+        + salas.map(s=>`<option value="${s.id}">${s.id} — ${s.turmas}</option>`).join('');
+    }
+    selSala.value = '';
+  }
   document.getElementById('inpTurmaAgenda2').value='';
   document.getElementById('inpObsAgenda2').value='';
   document.getElementById('erroAgendaCelula').classList.remove('visivel');
@@ -393,6 +404,13 @@ function fecharAgendaCelula(){ document.getElementById('sombraAgendaCelula').cla
 async function confirmarAgendaCelula(){
   const erro = document.getElementById('erroAgendaCelula');
   erro.classList.remove('visivel');
+  const ehSalaInformatica = agendaCelulaAtiva.recurso === 'sala_informatica';
+  const salaEscolhida = document.getElementById('selSalaAgenda2').value;
+  if(!ehSalaInformatica && !salaEscolhida){
+    erro.textContent = 'Selecione a sala para onde vai levar a estação.';
+    erro.classList.add('visivel');
+    return;
+  }
   try{
     await api('/agendamentos', {
       recurso: agendaCelulaAtiva.recurso,
@@ -400,6 +418,7 @@ async function confirmarAgendaCelula(){
       periodoId: agendaCelulaAtiva.periodoId,
       dataInicio: agendaCelulaAtiva.dataInicio,
       dataFim: agendaCelulaAtiva.dataFim || undefined,
+      sala: ehSalaInformatica ? undefined : salaEscolhida,
       turma: document.getElementById('inpTurmaAgenda2').value.trim() || undefined,
       observacao: document.getElementById('inpObsAgenda2').value.trim() || undefined,
     });
@@ -574,6 +593,8 @@ function preencherEdicaoEstacao(listaEstacoes){
   if(!e) return;
   document.getElementById('inpCapEditar').value = e.capacidade;
   document.getElementById('inpQtdEditar').value = e.qtd ?? '';
+  document.getElementById('selTipoEditar').value = e.tipo || 'notebook';
+  document.getElementById('inpMarcaEditar').value = e.marca || '';
 }
 
 async function salvarEdicaoEstacao(){
@@ -584,6 +605,8 @@ async function salvarEdicaoEstacao(){
     await api(`/estacoes/${id}`, {
       capacidade: Number(document.getElementById('inpCapEditar').value),
       qtd: Number(document.getElementById('inpQtdEditar').value),
+      tipo: document.getElementById('selTipoEditar').value,
+      marca: document.getElementById('inpMarcaEditar').value.trim(),
     }, 'PUT');
     toast('✅ Estação atualizada.');
     await carregarAdminEstacoes();

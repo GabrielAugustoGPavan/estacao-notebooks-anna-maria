@@ -318,6 +318,19 @@
               <input type="number" id="inpQtdEditar" min="0">
             </div>
           </div>
+          <div class="linha-botoes">
+            <div class="campo" style="flex:1">
+              <label for="selTipoEditar">Tipo de aparelho</label>
+              <select id="selTipoEditar">
+                <option value="notebook">Notebooks</option>
+                <option value="tablet">Tablets</option>
+              </select>
+            </div>
+            <div class="campo" style="flex:1">
+              <label for="inpMarcaEditar">Marca do gabinete</label>
+              <input type="text" id="inpMarcaEditar" placeholder="ex.: TES Guardian">
+            </div>
+          </div>
           <button class="btn" onclick="salvarEdicaoEstacao()">Salvar alterações</button>
         </div>
       </div>
@@ -389,6 +402,10 @@
     <div class="campo" id="campoTurmaAgenda2">
       <label for="inpTurmaAgenda2">Turma</label>
       <input type="text" id="inpTurmaAgenda2" placeholder="ex.: 8º B">
+    </div>
+    <div class="campo" id="campoSalaAgenda2">
+      <label for="selSalaAgenda2">Sala para onde vai levar a estação</label>
+      <select id="selSalaAgenda2"></select>
     </div>
     <div class="campo">
       <label for="inpObsAgenda2">Observação (opcional)</label>
