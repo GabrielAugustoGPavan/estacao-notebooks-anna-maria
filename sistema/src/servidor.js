@@ -375,14 +375,17 @@ app.put('/api/estacoes/:id', exigirLogin, exigirGestao, rota(async (req, res) =>
 
   const capacidade = Number(req.body?.capacidade);
   const qtd = Number(req.body?.qtd);
+  const tipo = req.body?.tipo === undefined ? e.tipo : (req.body.tipo === 'tablet' ? 'tablet' : 'notebook');
+  const marca = String(req.body?.marca || '').trim() || e.marca;
   if (!Number.isInteger(capacidade) || capacidade < 1) {
     return res.status(400).json({ erro: 'Capacidade deve ser um número inteiro maior que zero.' });
   }
   if (!Number.isInteger(qtd) || qtd < 0 || qtd > capacidade) {
     return res.status(400).json({ erro: `Quantidade deve ser um número inteiro entre 0 e ${capacidade}.` });
   }
-  await run('UPDATE estacoes SET capacidade=?, qtd=?, divergencia=0 WHERE id=?', [capacidade, qtd, e.id]);
-  await notificarGestao(`Estação ${e.id} — capacidade/quantidade ajustadas manualmente pela gestão para ${qtd}/${capacidade}.`);
+  await run('UPDATE estacoes SET capacidade=?, qtd=?, divergencia=0, tipo=?, marca=? WHERE id=?',
+    [capacidade, qtd, tipo, marca, e.id]);
+  await notificarGestao(`Estação ${e.id} — ajustada pela gestão: ${qtd}/${capacidade} ${tipo === 'tablet' ? 'tablets' : 'notebooks'} (${marca}).`);
   res.json({ ok: true });
 }));
 
@@ -512,13 +515,13 @@ app.get('/api/agendamentos', exigirLogin, rota(async (req, res) => {
   res.json(linhas.map(a => ({
     id: a.id, recurso: a.recurso, diaSemana: a.dia_semana, periodoId: a.periodo_id,
     dataInicio: a.data_inicio, dataFim: a.data_fim, indefinida: a.data_fim === DATA_FIM_INDEFINIDA,
-    turma: a.turma, observacao: a.observacao,
+    sala: a.sala, turma: a.turma, observacao: a.observacao,
     professorNome: a.professor_nome, minha: a.usuario_id === req.usuario.id,
   })));
 }));
 
 app.post('/api/agendamentos', exigirLogin, rota(async (req, res) => {
-  const { recurso, diaSemana, periodoId, dataInicio, dataFim, turma, observacao } = req.body || {};
+  const { recurso, diaSemana, periodoId, dataInicio, dataFim, sala, turma, observacao } = req.body || {};
   const recursos = await montarRecursos();
   if (!recursos.some(r => r.id === recurso)) return res.status(400).json({ erro: 'Selecione o que deseja agendar.' });
   if (!DIAS_SEMANA.some(d => d.id === diaSemana)) return res.status(400).json({ erro: 'Selecione o dia da semana.' });
@@ -536,6 +539,10 @@ app.post('/api/agendamentos', exigirLogin, rota(async (req, res) => {
   if (recurso === 'sala_informatica' && !turma) {
     return res.status(400).json({ erro: 'Informe a turma que usará a Sala de Informática.' });
   }
+  // Reservando uma estação (carrinho móvel): precisa dizer pra qual sala vai levar
+  if (recurso !== 'sala_informatica' && !SALAS.some(s => s.id === sala)) {
+    return res.status(400).json({ erro: 'Selecione a sala para onde a estação será levada.' });
+  }
 
   const conflito = await get(`
     SELECT a.id, u.nome FROM agendamentos a JOIN usuarios u ON u.id = a.usuario_id
@@ -547,11 +554,12 @@ app.post('/api/agendamentos', exigirLogin, rota(async (req, res) => {
   }
 
   const tipo = dataFimFinal === DATA_FIM_INDEFINIDA ? 'semana' : (dataInicio === dataFimFinal ? 'dia' : 'mes');
+  const salaFinal = recurso === 'sala_informatica' ? null : sala;
 
   await run(
-    `INSERT INTO agendamentos (usuario_id, recurso, tipo, dia_semana, periodo_id, mes, data_inicio, data_fim, turma, observacao, status, criado_em)
-     VALUES (?,?,?,?,?,?,?,?,?,?, 'confirmado', ?)`,
-    [req.usuario.id, recurso, tipo, diaSemana, periodoId, null, dataInicio, dataFimFinal, turma || null, observacao || null, agora()]
+    `INSERT INTO agendamentos (usuario_id, recurso, tipo, dia_semana, periodo_id, mes, data_inicio, data_fim, sala, turma, observacao, status, criado_em)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?, 'confirmado', ?)`,
+    [req.usuario.id, recurso, tipo, diaSemana, periodoId, null, dataInicio, dataFimFinal, salaFinal, turma || null, observacao || null, agora()]
   );
 
   const mensagem = dataFimFinal === DATA_FIM_INDEFINIDA

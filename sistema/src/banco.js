@@ -166,6 +166,7 @@ const TABELAS = [
     mes           TEXT,
     data_inicio   TEXT NOT NULL,
     data_fim      TEXT NOT NULL,
+    sala          TEXT,
     turma         TEXT,
     observacao    TEXT,
     status        TEXT NOT NULL DEFAULT 'confirmado' CHECK (status IN ('confirmado','cancelado')),
@@ -196,6 +197,7 @@ async function migrar() {
   await adicionarColuna('usuarios', 'cargo', 'TEXT');
   await adicionarColuna('estacoes', 'tipo', "TEXT NOT NULL DEFAULT 'notebook'");
   await adicionarColuna('estacoes', 'marca', "TEXT NOT NULL DEFAULT 'TES Guardian'");
+  await adicionarColuna('agendamentos', 'sala', 'TEXT');
   // Estação C já existente em bancos antigos passa a ser da marca JEYTECH
   await run("UPDATE estacoes SET marca='JEYTECH' WHERE id='C' AND marca='TES Guardian'");
 
@@ -219,6 +221,7 @@ async function migrar() {
       mes           TEXT,
       data_inicio   TEXT NOT NULL,
       data_fim      TEXT NOT NULL,
+      sala          TEXT,
       turma         TEXT,
       observacao    TEXT,
       status        TEXT NOT NULL DEFAULT 'confirmado' CHECK (status IN ('confirmado','cancelado')),
