@@ -152,21 +152,12 @@
       </div>
       <div class="bloco-gestao oculto" id="blocoAgendaEstacoesProfessor">
         <h3>🗓 Reservar uma estação com antecedência</h3>
-        <p class="explic">Escolha a estação, o período da reserva e clique num horário livre.</p>
+        <p class="explic">Escolha a estação, navegue até a semana desejada e clique num horário livre.</p>
         <div class="seletor-recurso" id="seletorRecursoEstacoesProf"></div>
-        <div class="linha-vigencia">
-          <div class="campo">
-            <label for="inpDeEstacoesProf">De</label>
-            <input type="date" id="inpDeEstacoesProf" onchange="ajustarMinAte('estacoesProf')">
-          </div>
-          <div class="campo" id="campoAteEstacoesProf">
-            <label for="inpAteEstacoesProf">Até</label>
-            <input type="date" id="inpAteEstacoesProf">
-          </div>
-          <label class="opcao-indefinida">
-            <input type="checkbox" id="chkIndefinidoEstacoesProf" checked onchange="alternarIndefinido('estacoesProf')">
-            Sem data para terminar (toda semana)
-          </label>
+        <div class="navegador-semana">
+          <button type="button" class="btn secundario pequeno" id="btnSemanaAntEstacoesProf" onclick="mudarSemana('estacoesProf',-1)">←</button>
+          <span id="rotuloSemanaEstacoesProf"></span>
+          <button type="button" class="btn secundario pequeno" onclick="mudarSemana('estacoesProf',1)">→</button>
         </div>
         <div style="overflow-x:auto"><table class="grade-horarios" id="tabelaAgendaEstacoesProfessor"></table></div>
       </div>
@@ -177,21 +168,12 @@
       <button class="btn secundario pequeno oculto" id="btnVoltarAgenda" onclick="voltarHomeProfessor()" style="margin-bottom:16px">← Voltar</button>
       <div class="bloco-gestao" style="margin-top:0">
         <h3 id="tituloAgendaSecao">🗓 Grade semanal de agendamentos</h3>
-        <p class="explic">Escolha o período da reserva e clique num horário livre.</p>
+        <p class="explic">Navegue até a semana desejada e clique num horário livre.</p>
         <div class="seletor-recurso" id="seletorRecursoAgenda"></div>
-        <div class="linha-vigencia">
-          <div class="campo">
-            <label for="inpDePrincipal">De</label>
-            <input type="date" id="inpDePrincipal" onchange="ajustarMinAte('principal')">
-          </div>
-          <div class="campo" id="campoAtePrincipal">
-            <label for="inpAtePrincipal">Até</label>
-            <input type="date" id="inpAtePrincipal">
-          </div>
-          <label class="opcao-indefinida">
-            <input type="checkbox" id="chkIndefinidoPrincipal" checked onchange="alternarIndefinido('principal')">
-            Sem data para terminar (toda semana)
-          </label>
+        <div class="navegador-semana">
+          <button type="button" class="btn secundario pequeno" id="btnSemanaAntPrincipal" onclick="mudarSemana('principal',-1)">←</button>
+          <span id="rotuloSemanaPrincipal"></span>
+          <button type="button" class="btn secundario pequeno" onclick="mudarSemana('principal',1)">→</button>
         </div>
         <div style="overflow-x:auto"><table class="grade-horarios" id="tabelaAgenda"></table></div>
       </div>
@@ -406,6 +388,14 @@
     <div class="campo" id="campoSalaAgenda2">
       <label for="selSalaAgenda2">Sala para onde vai levar a estação</label>
       <select id="selSalaAgenda2"></select>
+    </div>
+    <label class="opcao-indefinida">
+      <input type="checkbox" id="chkIndefinidoAgenda2" checked onchange="alternarIndefinidoModal()">
+      Repetir toda semana a partir dessa data (até cancelar)
+    </label>
+    <div class="campo oculto" id="campoAteAgenda2">
+      <label for="inpAteAgenda2">Repetir até (opcional — deixe em branco pra ser só nesse dia)</label>
+      <input type="date" id="inpAteAgenda2">
     </div>
     <div class="campo">
       <label for="inpObsAgenda2">Observação (opcional)</label>

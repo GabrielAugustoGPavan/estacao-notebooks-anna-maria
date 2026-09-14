@@ -232,48 +232,63 @@ function botaoRecurso(r, atual, onclickFn){
   return `<button class="${r.id===atual?'ativo':''}" onclick="${onclickFn}('${r.id}')">${r.nome}</button>`;
 }
 
-function montarHtmlGrade(lista, recurso, contexto){
-  const mapa = {};
-  lista.forEach(a=>{
-    const chave = a.diaSemana+'|'+a.periodoId;
-    (mapa[chave] = mapa[chave] || []).push(a);
-  });
-  const hoje = new Date().toISOString().slice(0,10);
-  // Quando há mais de uma reserva pra mesma célula (ex.: "toda semana" +
-  // uma exceção que não se sobrepõe), mostra a que vale hoje; se nenhuma
-  // vale hoje ainda, mostra a próxima que vai valer.
-  function escolher(lista){
-    if(lista.length===1) return lista[0];
-    const vigenteHoje = lista.find(a=>a.dataInicio<=hoje && a.dataFim>=hoje);
-    if(vigenteHoje) return vigenteHoje;
-    return [...lista].sort((a,b)=>a.dataInicio.localeCompare(b.dataInicio))[0];
-  }
+/* ---- Semana de calendário exibida em cada grade (não é mais um "modelo" abstrato) ---- */
+const hojeISO = () => new Date().toISOString().slice(0,10);
+
+function segundaDaSemana(dataISO){
+  const [a,m,d] = dataISO.split('-').map(Number);
+  const dt = new Date(a, m-1, d);
+  const diff = (dt.getDay() + 6) % 7; // 0=segunda, ..., 6=domingo
+  dt.setDate(dt.getDate() - diff);
+  return dt.toISOString().slice(0,10);
+}
+function somarDias(dataISO, dias){
+  const [a,m,d] = dataISO.split('-').map(Number);
+  const dt = new Date(a, m-1, d);
+  dt.setDate(dt.getDate() + dias);
+  return dt.toISOString().slice(0,10);
+}
+function datasDaSemana(segundaISO){
+  return diasSemana.map((d,i)=>({ id: d.id, nome: d.nome, data: somarDias(segundaISO, i) }));
+}
+function rotuloSemana(segundaISO){
+  const sexta = somarDias(segundaISO, 4);
+  return `Semana de ${dataBr(segundaISO).slice(0,5)} a ${dataBr(sexta).slice(0,5)}`;
+}
+
+let semanaAtual = { principal: null, estacoesProf: null };
+
+function montarHtmlGrade(lista, recurso, contexto, datas){
+  const hoje = hojeISO();
   function rotuloVigencia(a){
     if(a.indefinida) return '';
     if(a.dataInicio===a.dataFim) return `<span class="tag-tipo-agenda">📅 ${dataBr(a.dataInicio)}</span>`;
     return `<span class="tag-tipo-agenda">📅 ${dataBr(a.dataInicio)}–${dataBr(a.dataFim)}</span>`;
   }
 
-  let linhas = '<tr><th></th>' + diasSemana.map(d=>`<th>${d.nome.replace('-feira','')}</th>`).join('') + '</tr>';
+  let linhas = '<tr><th></th>' + datas.map(d=>`<th>${d.nome.replace('-feira','')}<br><small>${dataBr(d.data).slice(0,5)}</small></th>`).join('') + '</tr>';
   let turnoAnterior = null;
   periodos.forEach(p=>{
     if(p.turno !== turnoAnterior){
-      linhas += `<tr class="turno-divisor"><td colspan="${diasSemana.length+1}">${p.turno}</td></tr>`;
+      linhas += `<tr class="turno-divisor"><td colspan="${datas.length+1}">${p.turno}</td></tr>`;
       turnoAnterior = p.turno;
     }
     linhas += `<tr><td class="rotulo-periodo">${p.rotulo}<small>${p.inicio}–${p.fim}</small></td>`;
-    diasSemana.forEach(d=>{
-      const lista2 = mapa[d.id+'|'+p.id];
-      if(lista2){
-        const ag = escolher(lista2);
+    datas.forEach(d=>{
+      // A reserva vale pra essa célula se a data exata dessa coluna cair
+      // dentro da vigência (data_inicio..data_fim) daquela reserva.
+      const ag = lista.find(a=>a.diaSemana===d.id && a.periodoId===p.id && a.dataInicio<=d.data && a.dataFim>=d.data);
+      if(ag){
         const podeCancelar = ag.minha || usuario.perfil==='gestao';
         linhas += `<td class="cel-agenda cel-ocupada ${ag.minha?'minha':''}">`
           + rotuloVigencia(ag)
           + `${ag.turma?ag.turma+'<br>':''}${ag.sala?ag.sala+'<br>':''}<small>Prof. ${ag.professorNome}</small>`
           + (podeCancelar ? ` <span class="cel-x" title="Cancelar reserva" onclick="cancelarAgendaCelula(${ag.id})">✕</span>` : '')
           + `</td>`;
+      } else if(d.data < hoje){
+        linhas += `<td class="cel-agenda cel-passada"></td>`;
       } else {
-        linhas += `<td class="cel-agenda cel-livre" title="Reservar" onclick="abrirAgendaCelula('${recurso}','${d.id}','${p.id}','${contexto}')">+</td>`;
+        linhas += `<td class="cel-agenda cel-livre" title="Reservar" onclick="abrirAgendaCelula('${recurso}','${d.id}','${p.id}','${contexto}','${d.data}')">+</td>`;
       }
     });
     linhas += '</tr>';
@@ -282,50 +297,29 @@ function montarHtmlGrade(lista, recurso, contexto){
 }
 
 async function carregarGradeEm(tabelaId, recurso, contexto){
+  if(!semanaAtual[contexto]) semanaAtual[contexto] = segundaDaSemana(hojeISO());
+  const datas = datasDaSemana(semanaAtual[contexto]);
   const lista = await api('/agendamentos?recurso='+encodeURIComponent(recurso));
-  document.getElementById(tabelaId).innerHTML = montarHtmlGrade(lista, recurso, contexto);
-}
+  document.getElementById(tabelaId).innerHTML = montarHtmlGrade(lista, recurso, contexto, datas);
 
-/* ---- Vigência da reserva (De/Até) — escolhida no topo, antes de clicar na grade ---- */
-const hojeISO = () => new Date().toISOString().slice(0,10);
-
-function idsContexto(contexto){
   const sufixo = contexto === 'principal' ? 'Principal' : 'EstacoesProf';
-  return {
-    inpDe: 'inpDe'+sufixo, inpAte: 'inpAte'+sufixo,
-    campoAte: 'campoAte'+sufixo, chkIndefinido: 'chkIndefinido'+sufixo,
-  };
+  document.getElementById('rotuloSemana'+sufixo).textContent = rotuloSemana(semanaAtual[contexto]);
+  document.getElementById('btnSemanaAnt'+sufixo).disabled = semanaAtual[contexto] <= segundaDaSemana(hojeISO());
 }
 
-function alternarIndefinido(contexto){
-  const ids = idsContexto(contexto);
-  const indefinido = document.getElementById(ids.chkIndefinido).checked;
-  document.getElementById(ids.campoAte).classList.toggle('oculto', indefinido);
-}
-
-function ajustarMinAte(contexto){
-  const ids = idsContexto(contexto);
-  const de = document.getElementById(ids.inpDe).value || hojeISO();
-  const inpAte = document.getElementById(ids.inpAte);
-  inpAte.min = de;
-  if(!inpAte.value || inpAte.value < de) inpAte.value = de;
-}
-
-function prepararControlesVigencia(contexto){
-  const ids = idsContexto(contexto);
-  const inpDe = document.getElementById(ids.inpDe);
-  inpDe.min = hojeISO();
-  if(!inpDe.value || inpDe.value < hojeISO()) inpDe.value = hojeISO();
-  document.getElementById(ids.chkIndefinido).checked = true;
-  ajustarMinAte(contexto);
-  alternarIndefinido(contexto);
+function mudarSemana(contexto, delta){
+  const semanaMinima = segundaDaSemana(hojeISO());
+  let nova = somarDias(semanaAtual[contexto] || semanaMinima, delta*7);
+  if(nova < semanaMinima) nova = semanaMinima; // não deixa navegar pra semanas passadas
+  semanaAtual[contexto] = nova;
+  recarregarGradeAtual();
 }
 
 /* ---- Grade dentro da aba "Agendamentos" da gestão (todos os recursos) ---- */
 async function mostrarAgendamentosGestao(){
   document.getElementById('tituloAgendaSecao').textContent = '🗓 Grade semanal de agendamentos';
   document.getElementById('seletorRecursoAgenda').classList.remove('oculto');
-  prepararControlesVigencia('principal');
+  semanaAtual.principal = segundaDaSemana(hojeISO());
   await selecionarRecursoAgendaGestao(recursoAgendaGestao);
 }
 async function selecionarRecursoAgendaGestao(id){
@@ -344,8 +338,8 @@ function abrirAgendaSalaProfessor(){
   document.getElementById('btnVoltarAgenda').classList.remove('oculto');
   document.getElementById('seletorRecursoAgenda').classList.add('oculto');
   document.getElementById('tituloAgendaSecao').textContent = '🗓 Agendamento da Sala de Informática';
-  document.getElementById('subPainel').textContent = 'Escolha o período da reserva e clique num horário livre.';
-  prepararControlesVigencia('principal');
+  document.getElementById('subPainel').textContent = 'Navegue até a semana desejada e clique num horário livre.';
+  semanaAtual.principal = segundaDaSemana(hojeISO());
   carregarGradeEm('tabelaAgenda', 'sala_informatica', 'principal').catch(err=>toast('⚠ '+err.message));
 }
 
@@ -358,30 +352,24 @@ async function selecionarRecursoEstacoesProf(id){
 }
 
 /* ---- Reservar/cancelar uma célula da grade ---- */
-async function abrirAgendaCelula(recurso, dia, periodoId, contexto){
+function alternarIndefinidoModal(){
+  const indefinido = document.getElementById('chkIndefinidoAgenda2').checked;
+  document.getElementById('campoAteAgenda2').classList.toggle('oculto', indefinido);
+}
+
+async function abrirAgendaCelula(recurso, dia, periodoId, contexto, dataExata){
   const p = periodos.find(x=>x.id===periodoId);
   const d = diasSemana.find(x=>x.id===dia);
-  const ids = idsContexto(contexto);
-  const indefinido = document.getElementById(ids.chkIndefinido).checked;
-  const dataInicio = document.getElementById(ids.inpDe).value;
-  const dataFim = indefinido ? null : document.getElementById(ids.inpAte).value;
 
-  // Não dá pra marcar um dia que já passou
-  if(!dataInicio || dataInicio < hojeISO()){
-    toast('⚠ Escolha uma data de início válida (hoje ou no futuro) antes de clicar num horário.');
-    return;
-  }
-  if(!indefinido && (!dataFim || dataFim < dataInicio)){
-    toast('⚠ A data final precisa ser igual ou depois da data de início.');
-    return;
-  }
+  agendaCelulaAtiva = { recurso, dia, periodoId, contexto, dataInicio: dataExata };
+  document.getElementById('tituloAgendaCelula').textContent = `Reservar — ${d.nome} (${dataBr(dataExata).slice(0,5)}), ${p.rotulo}`;
+  document.getElementById('subAgendaCelula').textContent = `${nomeRecurso(recurso)} · ${p.inicio}–${p.fim}`;
 
-  agendaCelulaAtiva = { recurso, dia, periodoId, contexto, dataInicio, dataFim };
-  const rotuloVigencia = indefinido ? 'toda semana, até cancelar'
-    : dataInicio===dataFim ? `só ${dataBr(dataInicio)}`
-    : `de ${dataBr(dataInicio)} até ${dataBr(dataFim)}`;
-  document.getElementById('tituloAgendaCelula').textContent = `Reservar — ${d.nome}, ${p.rotulo}`;
-  document.getElementById('subAgendaCelula').textContent = `${nomeRecurso(recurso)} · ${p.inicio}–${p.fim} · ${rotuloVigencia}`;
+  document.getElementById('chkIndefinidoAgenda2').checked = true;
+  const inpAte = document.getElementById('inpAteAgenda2');
+  inpAte.min = dataExata; inpAte.value = '';
+  alternarIndefinidoModal();
+
   const ehSalaInformatica = recurso === 'sala_informatica';
   document.getElementById('campoTurmaAgenda2').style.display = ehSalaInformatica ? 'block' : 'none';
   document.getElementById('campoSalaAgenda2').style.display = ehSalaInformatica ? 'none' : 'block';
@@ -411,13 +399,20 @@ async function confirmarAgendaCelula(){
     erro.classList.add('visivel');
     return;
   }
+  const indefinido = document.getElementById('chkIndefinidoAgenda2').checked;
+  const ate = document.getElementById('inpAteAgenda2').value;
+  if(!indefinido && ate && ate < agendaCelulaAtiva.dataInicio){
+    erro.textContent = 'A data final precisa ser igual ou depois da data escolhida.';
+    erro.classList.add('visivel');
+    return;
+  }
   try{
     await api('/agendamentos', {
       recurso: agendaCelulaAtiva.recurso,
       diaSemana: agendaCelulaAtiva.dia,
       periodoId: agendaCelulaAtiva.periodoId,
       dataInicio: agendaCelulaAtiva.dataInicio,
-      dataFim: agendaCelulaAtiva.dataFim || undefined,
+      dataFim: indefinido ? undefined : (ate || agendaCelulaAtiva.dataInicio),
       sala: ehSalaInformatica ? undefined : salaEscolhida,
       turma: document.getElementById('inpTurmaAgenda2').value.trim() || undefined,
       observacao: document.getElementById('inpObsAgenda2').value.trim() || undefined,
@@ -452,7 +447,7 @@ function abrirEstacoesProfessor(){
   document.getElementById('btnVoltarEstacoes').classList.remove('oculto');
   document.getElementById('blocoAgendaEstacoesProfessor').classList.remove('oculto');
   document.getElementById('subPainel').textContent = 'Use o botão de cada estação para registrar a retirada ou devolução dos notebooks/tablets.';
-  prepararControlesVigencia('estacoesProf');
+  semanaAtual.estacoesProf = segundaDaSemana(hojeISO());
   carregarPainel().catch(err=>toast('⚠ '+err.message));
   selecionarRecursoEstacoesProf(recursoAgendaEstacoesProf).catch(err=>toast('⚠ '+err.message));
 }
