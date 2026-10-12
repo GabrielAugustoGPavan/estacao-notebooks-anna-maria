@@ -256,6 +256,55 @@ async function montarRecursos() {
   ];
 }
 
+// Horários fixos das aulas de Tecnologia (Profª Magali) — extraídos do
+// horário oficial dos Anos Finais (6º ao 9º, manhã). Usam a Sala de
+// Informática, são recorrentes (sem data final) e nunca se sobrepõem entre
+// si (cada turma tem seu próprio horário de Tecnologia na semana).
+const HORARIOS_FIXOS_TECNOLOGIA = [
+  { dia: 'segunda', periodo: 'm3', turma: '7ºA' },
+  { dia: 'segunda', periodo: 'm4', turma: '7ºA' },
+  { dia: 'terca',   periodo: 'm1', turma: '8ºA' },
+  { dia: 'terca',   periodo: 'm2', turma: '8ºA' },
+  { dia: 'terca',   periodo: 'm4', turma: '8ºB' },
+  { dia: 'quarta',  periodo: 'm3', turma: '7ºB' },
+  { dia: 'quarta',  periodo: 'm4', turma: '7ºB' },
+  { dia: 'quinta',  periodo: 'm1', turma: '9ºA' },
+  { dia: 'quinta',  periodo: 'm2', turma: '9ºA' },
+  { dia: 'quinta',  periodo: 'm4', turma: '9ºB' },
+  { dia: 'sexta',   periodo: 'm1', turma: '6ºB' },
+  { dia: 'sexta',   periodo: 'm2', turma: '6ºB' },
+  { dia: 'sexta',   periodo: 'm3', turma: '6ºA' },
+  { dia: 'sexta',   periodo: 'm4', turma: '6ºA' },
+];
+
+// Roda em TODO início do servidor (não só em banco vazio): garante que os
+// horários fixos existem, sem duplicar e sem sobrescrever se o horário já
+// estiver ocupado por outra reserva (fixa ou feita por algum professor).
+// Usa uma data de início FIXA (início do ano letivo), não "hoje": um horário
+// fixo institucional já vale desde sempre. Com "hoje", semear numa quarta faria
+// segunda/terça daquela semana ficarem sem o horário fixo.
+const INICIO_ANO_LETIVO = '2026-02-01';
+
+async function semearHorariosFixos() {
+  const magali = await get("SELECT id FROM usuarios WHERE nome=? AND perfil='professor'", ['Magali']);
+  if (!magali) return; // banco customizado sem essa professora — não força nada
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  for (const h of HORARIOS_FIXOS_TECNOLOGIA) {
+    const ocupado = await get(`
+      SELECT id FROM agendamentos
+      WHERE recurso='sala_informatica' AND dia_semana=? AND periodo_id=?
+        AND status='confirmado' AND data_fim >= ?
+    `, [h.dia, h.periodo, hoje]);
+    if (ocupado) continue;
+    await run(`
+      INSERT INTO agendamentos
+        (usuario_id, recurso, tipo, dia_semana, periodo_id, mes, data_inicio, data_fim, sala, turma, observacao, status, criado_em)
+      VALUES (?, 'sala_informatica', 'semana', ?, ?, NULL, ?, ?, NULL, ?, 'Horário fixo — aula de Tecnologia', 'confirmado', ?)
+    `, [magali.id, h.dia, h.periodo, INICIO_ANO_LETIVO, DATA_FIM_INDEFINIDA, h.turma, new Date().toISOString()]);
+  }
+}
+
 async function inicializar() {
   for (const sql of TABELAS) await run(sql);
   await migrar();
@@ -284,6 +333,7 @@ async function inicializar() {
     console.log('[banco]   Todos devem trocar a senha no primeiro acesso.');
   }
   console.log(`[banco] Modo: ${usaPostgres ? 'PostgreSQL (nuvem)' : 'SQLite (local — escola.db)'}`);
+  await semearHorariosFixos();
 }
 
 module.exports = {
