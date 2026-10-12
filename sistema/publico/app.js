@@ -248,6 +248,15 @@ function somarDias(dataISO, dias){
   dt.setDate(dt.getDate() + dias);
   return dt.toISOString().slice(0,10);
 }
+// Semana em que a grade abre (e a mais antiga que dá pra navegar): aos sábados
+// e domingos a semana letiva "atual" já acabou, então abre na próxima segunda.
+function semanaInicial(){
+  const hoje = hojeISO();
+  const [a,m,d] = hoje.split('-').map(Number);
+  const dow = new Date(a, m-1, d).getDay();
+  const seg = segundaDaSemana(hoje);
+  return (dow === 0 || dow === 6) ? somarDias(seg, 7) : seg;
+}
 function datasDaSemana(segundaISO){
   return diasSemana.map((d,i)=>({ id: d.id, nome: d.nome, data: somarDias(segundaISO, i) }));
 }
@@ -297,18 +306,18 @@ function montarHtmlGrade(lista, recurso, contexto, datas){
 }
 
 async function carregarGradeEm(tabelaId, recurso, contexto){
-  if(!semanaAtual[contexto]) semanaAtual[contexto] = segundaDaSemana(hojeISO());
+  if(!semanaAtual[contexto]) semanaAtual[contexto] = semanaInicial();
   const datas = datasDaSemana(semanaAtual[contexto]);
   const lista = await api('/agendamentos?recurso='+encodeURIComponent(recurso));
   document.getElementById(tabelaId).innerHTML = montarHtmlGrade(lista, recurso, contexto, datas);
 
   const sufixo = contexto === 'principal' ? 'Principal' : 'EstacoesProf';
   document.getElementById('rotuloSemana'+sufixo).textContent = rotuloSemana(semanaAtual[contexto]);
-  document.getElementById('btnSemanaAnt'+sufixo).disabled = semanaAtual[contexto] <= segundaDaSemana(hojeISO());
+  document.getElementById('btnSemanaAnt'+sufixo).disabled = semanaAtual[contexto] <= semanaInicial();
 }
 
 function mudarSemana(contexto, delta){
-  const semanaMinima = segundaDaSemana(hojeISO());
+  const semanaMinima = semanaInicial();
   let nova = somarDias(semanaAtual[contexto] || semanaMinima, delta*7);
   if(nova < semanaMinima) nova = semanaMinima; // não deixa navegar pra semanas passadas
   semanaAtual[contexto] = nova;
@@ -319,7 +328,7 @@ function mudarSemana(contexto, delta){
 async function mostrarAgendamentosGestao(){
   document.getElementById('tituloAgendaSecao').textContent = '🗓 Grade semanal de agendamentos';
   document.getElementById('seletorRecursoAgenda').classList.remove('oculto');
-  semanaAtual.principal = segundaDaSemana(hojeISO());
+  semanaAtual.principal = semanaInicial();
   await selecionarRecursoAgendaGestao(recursoAgendaGestao);
 }
 async function selecionarRecursoAgendaGestao(id){
@@ -339,7 +348,7 @@ function abrirAgendaSalaProfessor(){
   document.getElementById('seletorRecursoAgenda').classList.add('oculto');
   document.getElementById('tituloAgendaSecao').textContent = '🗓 Agendamento da Sala de Informática';
   document.getElementById('subPainel').textContent = 'Navegue até a semana desejada e clique num horário livre.';
-  semanaAtual.principal = segundaDaSemana(hojeISO());
+  semanaAtual.principal = semanaInicial();
   carregarGradeEm('tabelaAgenda', 'sala_informatica', 'principal').catch(err=>toast('⚠ '+err.message));
 }
 
@@ -447,7 +456,7 @@ function abrirEstacoesProfessor(){
   document.getElementById('btnVoltarEstacoes').classList.remove('oculto');
   document.getElementById('blocoAgendaEstacoesProfessor').classList.remove('oculto');
   document.getElementById('subPainel').textContent = 'Use o botão de cada estação para registrar a retirada ou devolução dos notebooks/tablets.';
-  semanaAtual.estacoesProf = segundaDaSemana(hojeISO());
+  semanaAtual.estacoesProf = semanaInicial();
   carregarPainel().catch(err=>toast('⚠ '+err.message));
   selecionarRecursoEstacoesProf(recursoAgendaEstacoesProf).catch(err=>toast('⚠ '+err.message));
 }
